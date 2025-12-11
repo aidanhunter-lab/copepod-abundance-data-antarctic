@@ -15,6 +15,7 @@ lat_bound <- switch(hemisphere,
                     north = lat_lim[1])
 
 save.cleaned.data <- TRUE
+clear.on.completeion <- TRUE
 
 # Load packages -----------------------------------------------------------
 library(data.table)
@@ -5925,8 +5926,14 @@ if(save.cleaned.data){
     p <- file.path(p, f) #' full path
     write.csv(d, gzfile(p), row.names = FALSE) #' save cleaned data
   }
+}else{
+  message("Cleaned data were not saved to disk, so are retained in the workspace in the list 'DATA'.")
+  clear.on.completeion <- FALSE
 }
 
+if(clear.on.completeion){
+  rm(list=ls())
+}
 
 # Plots -------------------------------------------------------------------
 

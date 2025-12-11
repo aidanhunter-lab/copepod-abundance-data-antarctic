@@ -14,9 +14,6 @@ if(!grepl(dir.project.R, getwd())){
 #' Clean raw data from various sources and save the outputs as separate tables.
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#' Run the 'download copepod occurrence records.R' script first [hmmm, maybe the raw data should just be provided in the ./data directory]
-
-
 #' If `auto.select.data.sets` is FALSE then user input will be requested to
 #' select between data stored on disk.
 auto.select.data.sets <- TRUE
@@ -28,8 +25,7 @@ source('clean copepod occurrence records.R')
 
 #' It may be useful to clear RAM by restarting R before running the data
 #' compilation script in the next code section.
-
-rm(list=ls()); gc() #' flushing the R memory should be done inside the cleaning script
+#' `A possible solution to this is rewriting the scripts as functions that return NULL`
 
 # Compile -----------------------------------------------------------------
 
