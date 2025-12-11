@@ -50,7 +50,7 @@ dir.data.all$BAS_bongo                  <- file.path(dir.data.zoo, 'BAS', 'bongo
 dir.data.all$BAS_rmt                    <- file.path(dir.data.zoo, 'BAS', 'rmt nets')
 dir.data.all$BAS_mocness                <- file.path(dir.data.zoo, 'BAS', 'MOCNESS')
 dir.data.all$Schnack.Schiel             <- file.path(dir.data.zoo, 'Schnack-Schiel', 'datasets')
-dir.data.all$Guang.Yang                 <- file.path(dir.data.zoo, 'Guang_Yang')
+dir.data.all$CHINARE                    <- file.path(dir.data.zoo, 'CHINARE')
 dir.data.all$Palmer.LTER_MOCNESS        <- file.path(dir.data.zoo, 'Palmer_LTER', 'zooplankton 2009-2017')
 dir.data.all$Palmer.LTER_non_stratified <- file.path(dir.data.zoo, 'Palmer_LTER', 'zooplankton 1993-2008')
 
@@ -87,9 +87,10 @@ rm(R_functions)
 
 # Load copepod occurrence records ----------------------------------------
 
+#' Pull file names of original data (all with .gz or .zip extensions)
 all.data.file.names <- lapply(dir.data.all, function(z){
   f <- list.files(z)
-  f[!grepl('cleaned', f)]})
+  f[{grepl('.gz', f) | grepl('.zip', f)} & !grepl('cleaned', f)]})
 
 message('\nAll data file names:')
 print(all.data.file.names)
@@ -97,19 +98,21 @@ print(all.data.file.names)
 data.file.names <- setNames(vector('list', length = n.data.sources),
                             names(dir.data.all))
 
-# Automate data selection by default
+#' Automate data selection by default
 if(!exists('auto.select.data.sets')) auto.select.data.sets <- TRUE
 if(auto.select.data.sets){
+  #' 0 = all files (for data sources providing multiple files)
+  #' 1 = single file
   which.data.files <- setNames(vector('list', length = n.data.sources), names(data.file.names))
   which.data.files$OBIS <- 1
-  which.data.files$GBIF <- NA
-  which.data.files$BAS_bongo <- NA
-  which.data.files$BAS_rmt <- NA
+  which.data.files$GBIF <- 1
+  which.data.files$BAS_bongo <- 1
+  which.data.files$BAS_rmt <- 1
   which.data.files$BAS_mocness <- 0
   which.data.files$Schnack.Schiel <- 0
-  which.data.files$Guang.Yang <- 0
-  which.data.files$Palmer.LTER_MOCNESS <- NA
-  which.data.files$Palmer.LTER_non_stratified <- NA
+  which.data.files$CHINARE <- 0
+  which.data.files$Palmer.LTER_MOCNESS <- 1
+  which.data.files$Palmer.LTER_non_stratified <- 1
   which.data.files$AtlantNIRO <- 0
   which.data.files$ELTANIN <- 0
   which.data.files$Foxton_1956 <- 0
@@ -123,8 +126,10 @@ if(auto.select.data.sets){
 for(i in 1:n.data.sources){
   s <- names(data.file.names)[i]
   f <- all.data.file.names[[s]]
-  x <- vgrepl(c('\\.csv', '\\.zip', '\\.tab'), f, SIMPLIFY = FALSE)
-  x <- unlist(x[sapply(x, any)])
+  x <- matrix(vgrepl(c('\\.csv\\.gz', '\\.tab\\.gz', '\\.txt\\.gz'), f), ncol = 3)
+  x <- apply(x, 1, any)
+  # x <- vgrepl(c('\\.csv\\.gz', '\\.tab\\.gz', '\\.txt\\.gz'), f, SIMPLIFY = FALSE)
+  # x <- unlist(x[sapply(x, any)])
   if(sum(x) == 1) data.file.names[[s]] <- f[x] else{
     o <- f[x] # multiple options to choose from
     if(auto.select.data.sets){
@@ -172,39 +177,40 @@ for(i in 1:n.data.sources){
   for(j in 1:n.data.files[i]){
     file.name <- data.file.names[[Source]][j]
     file.path <- paste(Dir, file.name, sep = '/')
-    file.type <- strsplit(file.name, '\\.')[[1]][2]
+    file.type <- paste(tail(strsplit(file.name, '\\.')[[1]], -1), collapse = '.')
+    # file.type <- strsplit(file.name, '\\.')[[1]][2]
     switch(file.type,
-           csv = {
+           csv.gz = {
              if(!multiple.files){
                DATA[[i]] <- tryCatch(
                  read.csv(
-                   file.path, header = include.header[Source],
+                   gzfile(file.path), header = include.header[Source],
                    skip = skip.rows[Source]),
                  error = function(e) NA)
              }else{
                DATA[[i]][[j]] <- tryCatch(
                  read.csv(
-                   file.path, header = include.header[Source],
+                   gzfile(file.path), header = include.header[Source],
                    skip = skip.rows[Source]),
                  error = function(e) NA)}
            },
-           zip = {
-             if(Source == 'GBIF'){
-               tempDir <- paste(Dir, 'temp', sep = '/')
-               txtFile <- paste(tempDir, 'occurrence.txt', sep = '/')
-               unzip(file.path, exdir = tempDir)
-               if(!multiple.files){
-                 DATA[[i]] <- read.delim(txtFile, header = TRUE, quote = '')}else{
-                   DATA[[i]][[j]] <- read.delim(txtFile, header = TRUE, quote = '')}
-               unlink(tempDir, recursive = TRUE); rm(tempDir, txtFile)
-             }
-           },
-           tab = {
+           txt.gz = {
              if(!multiple.files){
-               DATA[[i]] <- read.delim(file.path, header = include.header[Source],
-                                       skip = skip.rows[Source])}else{
-                                         DATA[[i]][[j]] <- read.delim(file.path, header = include.header[Source],
-                                                                      skip = skip.rows[Source])}
+               DATA[[i]] <- tryCatch(
+                 read.delim(gzfile(file.path), header = include.header[Source],
+                            quote = ''), error = function(e) NA)
+             }else{
+               DATA[[i]][[j]] <- tryCatch(
+                 read.delim(gzfile(file.path), header = include.header[Source],
+                            quote = ''), error = function(e) NA)}
+           },
+           tab.gz = {
+             if(!multiple.files){
+               DATA[[i]] <- read.delim(gzfile(file.path), header = include.header[Source],
+                                       skip = skip.rows[Source])
+             }else{
+               DATA[[i]][[j]] <- read.delim(gzfile(file.path), header = include.header[Source],
+                                            skip = skip.rows[Source])}
            }
     )
     rm(file.name, file.path, file.type)
@@ -310,12 +316,12 @@ setCRS <- function(x, CRS = mapData$crs, baseCRS = mapData$crs_base){
 
 # Load supplementary tables -----------------------------------------------
 
-# Load COPEPOD taxa modifier table
-COPEPOD.taxa.modifiers <- read.csv(paste(dir.COPEPOD.portal, 'copecode-taxameta.modifier.csv', sep = '/'))[,-3]
-# Omit white space
+#' Load COPEPOD taxa modifier table
+COPEPOD.taxa.modifiers <- read.csv(gzfile(paste(dir.COPEPOD.portal, 'copecode-taxameta.modifier.csv.gz', sep = '/')))[,-3]
+#' Omit white space
 COPEPOD.taxa.modifiers$Taxa.Modifier.Description <- removeWhiteSpacePadding(COPEPOD.taxa.modifiers$Taxa.Modifier.Description)
 COPEPOD.taxa.modifiers$Taxa.Modifier.Description <- gsub('cf .', 'cf.', COPEPOD.taxa.modifiers$Taxa.Modifier.Description)
-# Extend table for easy indexing
+#' Extend table for easy indexing
 m <- max(COPEPOD.taxa.modifiers$Taxa.Modifier.Code)
 x <- data.frame(Taxa.Modifier.Code = 1:m, Taxa.Modifier.Description = character(m))
 x$Taxa.Modifier.Description[COPEPOD.taxa.modifiers$Taxa.Modifier.Code] <- COPEPOD.taxa.modifiers$Taxa.Modifier.Description
@@ -323,11 +329,11 @@ x$Taxa.Modifier.Description[x$Taxa.Modifier.Description == ''] <- NA
 COPEPOD.taxa.modifiers <- x
 rm(x, m)
 
-# Load COPEPOD life stage code table
-COPEPOD.life.stage.codes <- read.csv(paste(dir.COPEPOD.portal, 'copecode-taxameta.life_stage.csv', sep = '/'))[,-3]
-# Omit white space
+#' Load COPEPOD life stage code table
+COPEPOD.life.stage.codes <- read.csv(gzfile(paste(dir.COPEPOD.portal, 'copecode-taxameta.life_stage.csv.gz', sep = '/')))[,-3]
+#' Omit white space
 COPEPOD.life.stage.codes$Life.Stage.Description <- removeWhiteSpacePadding(COPEPOD.life.stage.codes$Life.Stage.Description)
-# Extend table for easy indexing
+#' Extend table for easy indexing
 m <- max(COPEPOD.life.stage.codes$Life.Stage.Code)
 x <- data.frame(Life.Stage.Code = 1:m, Life.Stage.Description = character(m))
 x$Life.Stage.Description[COPEPOD.life.stage.codes$Life.Stage.Code] <- COPEPOD.life.stage.codes$Life.Stage.Description
@@ -347,11 +353,11 @@ COPEPOD.life.stage.codes$Life.Stage.Description[j] <- gsub(' ','',COPEPOD.life.s
 COPEPOD.life.stage.codes$Life.Stage.Description[j] <- gsub('\\+', ' and ', COPEPOD.life.stage.codes$Life.Stage.Description[j])
 rm(x, m, i, j, k)
 
-# Load COPEPOD sex code table
-COPEPOD.sex.codes <- read.csv(paste(dir.COPEPOD.portal, 'copecode-taxameta.sex.csv', sep = '/'))
+#' Load COPEPOD sex code table
+COPEPOD.sex.codes <- read.csv(gzfile(paste(dir.COPEPOD.portal, 'copecode-taxameta.sex.csv.gz', sep = '/')))
 COPEPOD.sex.codes[,2] <- paste(COPEPOD.sex.codes[,2], COPEPOD.sex.codes[,3])
 COPEPOD.sex.codes <- COPEPOD.sex.codes[,-3]
-# Omit white space
+#' Omit white space
 COPEPOD.sex.codes$Taxa.Sex.Description <- removeWhiteSpacePadding(COPEPOD.sex.codes$Taxa.Sex.Description)
 
 # Filter/clean data -------------------------------------------------------
@@ -2694,38 +2700,205 @@ gc()
 
 
 
-# Guang Yang --------------------------------------------------------------
+# CHINARE -----------------------------------------------------------------
 
-Source <- 'Guang.Yang'
+Source <- 'CHINARE'
 
-message('\n------------------------\n',
-        'Cleaning Guang Yang data',
-        '\n------------------------')
+message('\n---------------------\n',
+        'Cleaning CHINARE data',
+        '\n---------------------')
 
 dat <- DATA[[Source]]
 
+#' Process each data set separately. The first is the multinet, the second is
+#' the norpac net.
+
+message('\nProcessing multi-net data')
+
+d <- dat[[1]]
+
+#' Create column names
+names(d) <- c('variable', paste('sample', 1:{ncol(d)-1}, sep = '.'))
+
+#' Spelling error
+d$variable <- sub('Longtitude', 'Longitude', d$variable)
+
+#' Dates
+i <- unname(unlist(d[d$variable == 'Date', -1]))
+d[d$variable == 'Date', -1] <- as.character(as.Date(i, format = '%d/%m/%Y'))
+
+#' Times
+x <- unname(unlist(d[d$variable == 'Sampling time',-1]))
+x <- gsub(' ','',x)
+x[nchar(x) == 5] <- paste(x[nchar(x) == 5], '00', sep =':')
+x[nchar(x) == 4] <- paste(paste0('0', x[nchar(x) == 4]), '00', sep = ':')
+d[d$variable == 'Sampling time',-1] <- x
+
+#' Put data in long format
+names(d)[-1] <- d[d$variable == 'Sample ID', -1]
+d <- d[d$variable != 'Sample ID',]
+d <- melt(d, id.vars = 'variable', variable.name = 'Sample.ID')
+d <- dcast(d, Sample.ID ~ ...)
+d <- melt(d, id.vars = c('Sample.ID', 'Depth(m)', 'Station', 'Longitude', 'Latitude', 'Sampling time', 'Date'))
+names(d)[c(2,6,8)] <- c('Depth', 'Time', 'Species')
+
+#' Date-time
+d$Date.Time <- as.POSIXlt(paste(d$Date, d$Time),
+                          format = c("%Y-%m-%d %H:%M:%S"))
+
+#' Depth
+d$Depth <- gsub(' ', '', d$Depth)
+d$Depth <- gsub('m', ' m', d$Depth)
+
+#' Station
+d$Station <- gsub(' ', '', d$Station)
+
+#' Species/stage
+life.stages <- c('C1-3', 'C1-C3', 'Juvenile', 'Adult', 'C4-5', 'F1-F3', 'NM', 'F4-F6', 'F4-6', 'larvae')
+life.stages <- sort(life.stages)
+
+x <- Vectorize(grepl, 'pattern')(life.stages, d$Species)
+stage.known <- apply(x, 1, any)
+y <- matrix(life.stages, 1)[rep(1,nrow(x)),]
+z <- t(y)[t(x)]
+d$Life.Stage <- NA
+d$Life.Stage[stage.known] <- z
+
+d$Species <- as.character(d$Species)
+i <- nchar(d$Species)
+j <- nchar(d$Life.Stage)
+k <- substr(d$Species, i - j + 1, i) == d$Life.Stage
+k[is.na(k)] <- FALSE
+d$Species[k] <- substr(d$Species[k], 1, i[k] - j[k] - 1)
+
+d$Life.Stage <- gsub('C1-3', 'C1-C3', d$Life.Stage)
+d$Life.Stage <- gsub('C4-5', 'C4-C5', d$Life.Stage)
+d$Life.Stage <- gsub('F4-6', 'F4-F6', d$Life.Stage)
+d$Life.Stage <- gsub('larvae', 'Larvae', d$Life.Stage)
+
+d$Net <- 'Multinet'
+d$Mesh.Size <- '200 µm'
+d$Net.Area <- '0.25 m2'
+d$Measurement.Unit <- 'ind/m3'
+
+#' Sort the data and ascribe column classes
+d <- d[,c('Sample.ID', 'Station', 'Date', 'Time', 'Date.Time', 'Longitude', 'Latitude', 'Depth', 'Net', 'Net.Area', 'Mesh.Size', 'Species', 'Life.Stage', 'value', 'Measurement.Unit')]
+
+d$Sample.ID <- as.character(d$Sample.ID)
+d$Sample.ID <- factor(d$Sample.ID, levels = sort(unique(d$Sample.ID)))
+
+d$Species <- factor(d$Species, levels = sort(unique(d$Species)))
+
+life.stages <- c('C1-C3', 'C4-C5', 'F1-F3', 'F4-F6', 'Larvae', 'Juvenile', 'Adult', 'NM')
+d$Life.Stage <- factor(d$Life.Stage, levels = life.stages)
+
+o <- order(d$Date.Time, d$Sample.ID, d$Species, d$Life.Stage)
+d <- d[o,]
+
+d$Sample.ID <- as.character(d$Sample.ID)
+d$Date.Time <- as.character(d$Date.Time)
+d$Species <- as.character(d$Species)
+d$Life.Stage <- as.character(d$Life.Stage)
+d$value <- as.numeric(d$value)
+
+
+#' Now process the second data set
+message('\nProcessing norpac net data')
+d1 <- d
+d <- dat[[2]]
+
+#' Create column names
+names(d) <- c('variable', paste('sample', 1:{ncol(d)-1}, sep = '.'))
+
+#' Dates
+i <- d[d$variable == 'sampling time', -1]
+j <- grepl('\\.', i)
+i[j] <- gsub('\\.', '/', i[j])
+i[j] <- paste0('20', i[j])
+i[j] <- format(strptime(i[j], '%Y/%m/%d'), '%Y-%m-%d')
+i[!j] <- format(strptime(i[!j], '%d/%m/%Y'), '%Y-%m-%d')
+d[d$variable == 'sampling time', -1] <- i
+
+#' Life stage and species names
+d$life.stage <- d$variable
+d$life.stage <- gsub('VI', '6', d$life.stage)
+d$life.stage <- gsub('IV', '4', d$life.stage)
+d$life.stage <- gsub('V', '5', d$life.stage)
+d$life.stage <- gsub('III', '3', d$life.stage)
+d$life.stage <- gsub('II', '2', d$life.stage)
+d$life.stage <- gsub('I', '1', d$life.stage)
+
+life.stages <- c(paste0('C', 1:5), paste0('F', 1:6), 'Adult', 'Juvenile', 'M', 'N')
+
+d$life.stage[!d$life.stage %in% life.stages] <- NA
+d$variable[d$life.stage %in% life.stages] <- NA
+
+for(i in 1:nrow(d)){
+  infill <- is.na(d$variable[i])
+  if(!infill) next
+  d$variable[i] <- d$variable[i-1]
+}
+
+d <- d[!apply(is.na(d[,-1]), 1, all),] #' remove empty rows
+
+i <- !is.na(d$life.stage)
+d$variable[i] <- paste(d$variable[i], d$life.stage[i], sep = '_')
+d <- d[,-ncol(d)]
+
+names(d)[-1] <- d[1,-1]
+d <- d[-1,]
+
+d <- melt(d, id.vars = 'variable', variable.name = 'station')
+d <- dcast(d, station ~ ...)
+d <- melt(d, id.vars = c('station', 'sampling time', 'longitude (E)', 'latitude (S)'))
+
+names(d)[c(2,5)] <- c('date', 'species')
+
+d$species <- as.character(d$species)
+x <- strsplit(d$species, '_')
+d$life.stage <- sapply(x, function(z) z[2])
+d$species <- sapply(x, function(z) z[1])
+
+d$net <- 'Norpac'
+d$mesh.size <- '300 µm'
+d$net.area <- '0.5 m2'
+d$measurement.unit <- 'ind/1000 m3'
+d$depth <- '0-200 m'
+
+#' Sort the data and ascribe column classes
+d <- d[,c('station', 'date', 'longitude (E)', 'latitude (S)', 'depth', 'net', 'net.area', 'mesh.size', 'species', 'life.stage', 'value', 'measurement.unit')]
+
+d$station <- as.character(d$station)
+d$station <- factor(d$station, levels = sort(unique(d$station)))
+
+d$date <- as.Date(d$date)
+d$species <- factor(d$species, levels = sort(unique(d$species)))
+
+life.stages <- c('N', paste0('C', 1:5), paste0('F', 1:6), 'Juvenile', 'Adult', 'M')
+d$life.stage <- factor(d$life.stage, levels = life.stages)
+
+o <- order(d$date, d$station, d$species, d$life.stage)
+d <- d[o,]
+
+d$station <- as.character(d$station)
+d$date <- as.character(d$date)
+d$species <- as.character(d$species)
+d$life.stage <- as.character(d$life.stage)
+d$value <- as.numeric(d$value)
+
+
+#' Combine the two data sets
 message('\n', "Combining data tables")
 
+dat <- list(d, d1)
+rm(d, d1)
+
 #' Regularise the data column names
-names(dat[[1]]) <- gsub('Longitude', 'Longitude.E', names(dat[[1]]))
-names(dat[[1]]) <- gsub('Latitude', 'Latitude.S', names(dat[[1]]))
+names(dat[[1]]) <- gsub('longitude \\(E\\)', 'longitude', names(dat[[1]]))
+names(dat[[1]]) <- gsub('latitude \\(S\\)', 'latitude', names(dat[[1]]))
 regColNames <- function(dat){
   n <- names(dat)
-  # remove blanks and periods from last characters
-  m <- nchar(n)
-  j <- substr(n, m, m)
-  k <- grepl('\\.', j) | grepl(' ', j)
-  i <- any(k)
-  while(i){
-    n[k] <- substr(n[k], 1, m[k]-1)
-    m <- nchar(n)
-    j <- substr(n, m, m)
-    k <- grepl('\\.', j) | grepl(' ', j)
-    i <- any(k)
-  }
-  # Replace double dot with single dots
-  n <- gsub('\\.\\.','\\.',n)
-  # Captitalise 1st letters of each word, separate words with periods
+  #' Captitalise 1st letters of each word, separate words with periods
   x <- strsplit(n, '\\.')
   n <- lapply(x, function(z){
     y <- sapply(1:length(z),
@@ -2769,7 +2942,7 @@ dat$Depth.Mid <- 0.5 * {i + j}
 dat$Depth.Min <- i
 dat$Depth.Max <- j
 dat <- dat[,names(dat) != 'Depth']
-i <- 1:which(names(dat) == 'Latitude.S')
+i <- 1:which(names(dat) == 'Latitude')
 j <- grep('Depth', names(dat))
 k <- 1:ncol(dat); k <- k[!k %in% c(i,j)]
 dat <- dat[,c(i,j,k)]
@@ -2782,11 +2955,14 @@ dat$Date.Time[i] <- ''
 dat$Time.Flag <- 'Assumed local time - time zone not specified'
 dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
 
+#' Column classes
+dat$Longitude <- as.numeric(dat$Longitude)
+dat$Latitude <- as.numeric(dat$Latitude)
 
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #' Remove rows outside of selected latitudinal range
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-i <- lat_lim[1] <= dat$Latitude.S & dat$Latitude.S <= lat_lim[2]
+i <- lat_lim[1] <= dat$Latitude & dat$Latitude <= lat_lim[2]
 # unique(dat$Latitude.S[!i])
 dat <- dat[i,]
 
@@ -2821,9 +2997,9 @@ dat <- suppressMessages(left_join(dat, x)) %>%
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~
 DATA[[Source]] <- dat
 
-message('\n------------------------\n',
-          'Finished Guang Yang data',
-        '\n------------------------')
+message('\n---------------------\n',
+        'Finished CHINARE data',
+        '\n---------------------')
 
 #' Clean up
 rm.vars <- ls()[!ls() %in% keep.vars]
@@ -5736,30 +5912,20 @@ gc()
 if(save.cleaned.data){
   for(Source in names(DATA)){
     m <- paste('Saving', Source, 'data')
-    cat('\n', m, '\n')
+    message('\n', m)
     d <- as.data.frame(DATA[[Source]]) #' extract data from main list
-    d <- d[,names(d) != 'geometry'] # save as standard data frame -- remove geometry field if converting from a spatial object
     f <- data.file.names[[Source]] # create file name for cleaned data
     if(length(f) == 1){
       f <- strsplit(f, '\\.')[[1]]
-      f <- paste0(paste(f[1], 'cleaned', sep = '_'), '.csv')
+      f <- paste(paste(f[1], 'cleaned', sep = '_'), 'csv.gz', sep = '.')
     }else{
-      f <- 'all_data_tables_cleaned.csv'
+      f <- 'all_data_tables_cleaned.csv.gz'
     }
     p <- dir.data.all[[Source]] #' directory path
     p <- file.path(p, f) #' full path
-    write.csv(d, p, row.names = FALSE) #' save cleaned data
+    write.csv(d, gzfile(p), row.names = FALSE) #' save cleaned data
   }
-  
-  # # Also save any input arguments needed in subsequent R scripts
-  # d <- data.frame(variable = 'lat_lim', class = 'vector', element = seq_along(lat_lim), value = lat_lim, unit = 'degrees N')
-  # f <- 'data filtering parameters.rds'
-  # p <- file.path(dir.temp, f)
-  # saveRDS(d, p)
-  # # write.table(d, p, row.names = FALSE, quote = FALSE, sep = ',')
 }
-
-
 
 
 # Plots -------------------------------------------------------------------
