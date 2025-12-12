@@ -67,7 +67,8 @@ compile.data <- function(species.selection = NULL,
   # Load all .R files from 'functions' directory into global environment
   
   omit.funs <- c('clean copepod occurrence records.R',
-                 'compile copepod occurrence records.R')
+                 'compile copepod occurrence records.R',
+                 'plot copepod occurrence records.R')
   R_functions <- list.files(dir.functions, pattern = "*.R$", ignore.case = TRUE)
   R_functions <- R_functions[!R_functions %in% omit.funs]
   get.functions <- function(dir, n, e){

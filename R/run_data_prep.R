@@ -41,3 +41,22 @@ clean.data()
 source('functions/compile copepod occurrence records.R')
 compile.data(species.selection = 'copepods')
 
+# Plot --------------------------------------------------------------------
+
+#' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' Examine the plots and basic summary statistics of the compiled data that
+#' feature in the associated data paper.
+#' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#' By default, the `plot.data()` function generates and save plots, but does not
+#' return output. Set the function arguments `return.plots` and
+#' `display.summary.stats` as TRUE to view plots in the active R session and for
+#' a print-out of basic data summary stats. The plots saved to disk may be easier
+#' to view because font sizes are not fixed by the R session.
+
+source('functions/plot copepod occurrence records.R')
+plot.data(return.plots = TRUE, display.summary.stats = TRUE)
+
+
+
+
