@@ -206,6 +206,8 @@ compile.data <- function(species.selection = NULL,
   
   dat <- as.list(dat) #' work with a list rather than data frame
   
+  # Regularise fields -------------------------------------------------------
+  
   #' Regularise column names between the various combined data sets.
   message('\n', 'Regularise column names and values...')
   
@@ -1940,8 +1942,9 @@ compile.data <- function(species.selection = NULL,
   
   dat <- dat[fields2keep]
   
-  
-  
+
+  # Omit duplicates ---------------------------------------------------------
+
   #' ~~~~~~~~~~~~~~~~~~~~~
   #' Remove duplicate rows
   #' ~~~~~~~~~~~~~~~~~~~~~
@@ -2262,7 +2265,11 @@ compile.data <- function(species.selection = NULL,
   dat$Event <- NULL
   rm(x, i, j, xi, s, snew)
   
-  #' Set all factors/dates to character before saving
+  
+
+  # Tidy before saving ------------------------------------------------------
+
+  #' Set all factors/dates to character
   for(i in 1:ncol(dat)){
     if(is.factor(dat[,i]) | class(dat[,i]) == 'Date'){
       dat[,i] <- as.character(dat[,i])}}
@@ -2271,7 +2278,23 @@ compile.data <- function(species.selection = NULL,
   dat$Time[is.na(dat$Time)] <- ''
   dat$Time.Flag[is.na(dat$Time.Flag)] <- ''
   
+  x <- dat$Data.Source
+  # any(is.na(x))
+  # unique(x)
+  x <- gsub('\\.', ' ', x)
+  x <- gsub('_', ' ', x)
+  x <- gsub('1955 1957', '1955-1957', x)
+  x <- gsub('Guang Yang', 'CHINARE', x)
+  # unique(x)
+  dat$Data.Source <- x
   
+  #' Swap periods for white space in the field names
+  x <- names(dat)
+  x <- gsub('\\.', ' ', x)
+  names(dat) <- x
+  
+  # Save --------------------------------------------------------------------
+
   data.size <- format(object.size(dat), 'Mb')
   message('\n', 'Compiled data size = ', paste0(data.size,'.'))
   
