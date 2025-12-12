@@ -2,10 +2,10 @@
 
 getMapData <- function(
     dataDirectory,
-    fileNames = list(coastline = 'ne_10m_coastline.shp',
-                     land = 'ne_10m_land.shp',
+    fileNames = list(coastline = 'ne_10m_coastline.shp.gz',
+                     land = 'ne_10m_land.shp.gz',
                      ocean = 'ne_10m_ocean.shp',
-                     iceshelf = 'ne_10m_antarctic_ice_shelves_polys.shp'),
+                     iceshelf = 'ne_10m_antarctic_ice_shelves_polys.shp.gz'),
     lon_lim = c(-180, 180), lat_lim = c(-90, 90), hemisphere = NULL, crs = NULL,
     res = NULL, createGrid = FALSE, grid.border.ice.or.land = 'ice',
     removeFrac = 0.05, returnPlot = FALSE, verbose = FALSE,
@@ -22,9 +22,10 @@ getMapData <- function(
     error("If hemisphere is specified then it must be either 'north' or 'south'")
   
   # Required packages
+  library(R.utils)
   library(sf)
   library(sp)
-  
+
   # Specify directories of stored shape files
   if(!dir.exists(dataDirectory)) stop(paste0('Specified dataDirectory (', dataDirectory, ') does not exist!'))
   subDirectories <- basename(list.dirs(dataDirectory))
@@ -48,7 +49,7 @@ getMapData <- function(
   
   # Processed map data is saved into 'temp' directory within the current working directory
   filePath <- paste(getwd(), 'temp', sep = '/')
-  if(!filePath %in% list.dirs(getwd())) dir.create(filePath)
+  if({autoSave | loadFromFile} & !filePath %in% list.dirs(getwd())) dir.create(filePath)
   fileName_map <- paste('map data',
                         paste('lon', paste(lon_lim, collapse = ' ')),
                         paste('lat', paste(lat_lim, collapse = ' ')), sep = '_')
@@ -80,9 +81,19 @@ getMapData <- function(
   # Create map --------------------------------------------------------------
   if(!mapIsLoaded){
     # Load the data
-    coastline <- st_read(coastlineFile, quiet = !verbose)
-    land      <- st_read(landFile,      quiet = !verbose)
-    iceshelf  <- st_read(iceshelfFile,  quiet = !verbose)
+    load.shape.file <- function(n, q = !verbose){
+      m <- nchar(n)
+      is.gz.compressed <- substr(n, m-2, m) == '.gz'
+      if(is.gz.compressed){
+        gunzip(n)
+        n <- substr(n, 1, m-3)}
+      x <- st_read(n, quiet = q)
+      if(is.gz.compressed) gzip(n)
+      return(x)}
+    
+    coastline <- load.shape.file(coastlineFile)
+    land <- load.shape.file(landFile)
+    iceshelf <- load.shape.file(iceshelfFile)
     
     coastline <- coastline[!is.na(coastline$featurecla),]
     land <- land[!is.na(land$featurecla),]

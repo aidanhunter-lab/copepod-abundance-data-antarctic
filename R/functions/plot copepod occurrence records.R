@@ -38,9 +38,8 @@ plot.data <- function(
   dir.data.compiled <- file.path(dir.data, 'zooplankton', 'compiled', 'copepoda')
   dir.data.map <- file.path(dir.data, 'map files', 'Natural Earth')
   dir.plots <- file.path(dir.project, 'plots')
+  if(save.plots & !dir.exists(dir.plots)) dir.create(dir.plots)
 
-  # dir.git.functions <- '/home/aihunt/Documents/Git Repos/BIOPOLE-SDM/R/functions'
-  
   # Load functions ----------------------------------------------------------
 
   omit.funs <- c('clean copepod occurrence records.R',
@@ -82,8 +81,9 @@ plot.data <- function(
   
   lat.lim <- c(-90, -27.5) #' adjust northern limit to avoid overlap of boundary and data points
   map.dat <- getMapData(dataDirectory = dir.data.map, hemisphere = 'south',
-                        lat_lim = lat.lim, map_colour = map.colour, map_linewidths = map.linewidths,
-                        autoSave = FALSE, loadFromFile = FALSE, returnPlot = TRUE)
+                        lat_lim = lat.lim, map_colour = map.colour,
+                        map_linewidths = map.linewidths, autoSave = FALSE,
+                        loadFromFile = FALSE, returnPlot = TRUE)
   
   map <- map.dat$map_plot
   crs.base <- map.dat$crs_base
