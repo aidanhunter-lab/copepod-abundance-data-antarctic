@@ -14,18 +14,11 @@ if(!grepl(dir.project.R, getwd())){
 #' Clean raw data from various sources and save the outputs as separate tables.
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#' If `auto.select.data.sets` is FALSE then user input will be requested to
-#' select between data stored on disk.
-auto.select.data.sets <- TRUE
-
-#' Sourcing `clean copepod occurrence records.R` loads original, raw data sets,
-#' cleans them, then saves output tables (with '_cleaned' appended to the file
-#' name) into the directories holding the original data.
-source('clean copepod occurrence records.R')
-
-#' It may be useful to clear RAM by restarting R before running the data
-#' compilation script in the next code section.
-#' `A possible solution to this is rewriting the scripts as functions that return NULL`
+#' The `clean.data()` function loads original, raw data sets, cleans them, then
+#' saves output tables (with '_cleaned' appended to the file name) into the
+#' directories holding the original data.
+source('functions/clean copepod occurrence records.R')
+clean.data()
 
 # Compile -----------------------------------------------------------------
 
@@ -34,17 +27,17 @@ source('clean copepod occurrence records.R')
 #' the output.
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+#' The `compile.data()` function loads the cleaned data sets (produced in the
+#' above step), harmonises field names and within-field notation, combines the
+#' data into a single table, removes duplicated records, then saves the output.
+
 #' If `species.selection` is 'copepods' then data related to all copepods is
 #' returned by comparing reported species names to a comprehensive list of
 #' copepod genera. Otherwise, one or more particular species (separated by
 #' underscores) may be selected, e.g, by setting `species.selection` to
 #' 'Calanoides acutus_Calanus propinquus'. This feature is somewhat redundant as
 #' species can simply be filtered out from the complete copepod data set.
-species.selection <- 'copepods'
 
-#' Sourcing `compile copepod occurrence records.R` loads the cleaned data sets 
-#' (produced in the above step), harmonises field names and within-field
-#' notation, combines the data into a single table, removes duplicated records,
-#' then saves the output.
-source('compile copepod occurrence records.R')
+source('functions/compile copepod occurrence records.R')
+compile.data(species.selection = 'copepods')
 
