@@ -4,3 +4,9 @@ data/**/*.tab.gz filter=lfs diff=lfs merge=lfs -text
 data/**/*.txt.gz filter=lfs diff=lfs merge=lfs -text
 data/**/*.txt filter=lfs diff=lfs merge=lfs -text
 data/**/*.png filter=lfs diff=lfs merge=lfs -text
+data/**/*.cpg filter=lfs diff=lfs merge=lfs -text
+data/**/*.dbf filter=lfs diff=lfs merge=lfs -text
+data/**/*.prj filter=lfs diff=lfs merge=lfs -text
+data/**/*.shp filter=lfs diff=lfs merge=lfs -text
+data/**/*.shp.gz filter=lfs diff=lfs merge=lfs -text
+data/**/*.shx filter=lfs diff=lfs merge=lfs -text
