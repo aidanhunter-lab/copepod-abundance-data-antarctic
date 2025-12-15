@@ -11,6 +11,7 @@ This work is output from the <a href="https://biopole.ac.uk/">BIOPOLE</a> projec
 Code scripts are contained in the `R` directory. The entire procedure for cleaning and compiling the data, and producing some output plots & summary statistics, is implemented through `run_data_prep.R`, which is the only script that needs to be opened. This simple script sources three functions, contained in the `R/functions` directory, that should be run in succession to clean the original data, compile it into a single table, then produce plots.
 
 #### Data
+The compiled data product is not stored in this repository but is accessible from the above link.
 In the interest of reproducability, the raw, unprocessed data sets are included in the `data/zooplankton` directory. These were compressed as gzip files and stored in this repository using Git LFS. If cloning the repository ensure that Git LFS is installed on your computer so that the download properly handles the data files. Please note that there is a monthly download limit on LFS files, so if the code downloads successfully but the original data files do not (and Git LFS is installed on your computer) then it's likely that this threshold has been exceeded.
 
 #### Software
