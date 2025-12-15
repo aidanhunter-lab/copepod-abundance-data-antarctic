@@ -2301,11 +2301,12 @@ compile.data <- function(species.selection = NULL,
       s <- sapply(s, function(z) paste(substr(z[1],1,1), z[length(z)], sep = ' '))
     }
     f <- paste0(paste('compiled data', paste(s, collapse = '_'), sep = '_'), '.csv.gz')
-    p <- paste(dir.data.zoo, 'compiled', 'copepoda', f, sep = '/')
+    p <- file.path(dir.data.zoo, 'compiled', 'copepoda')
+    if(!dir.exists(p)) dir.create(p, recursive = TRUE)
+    p <- file.path(p, f)
     message('\nSaving compiled data: ', p)
     write.csv(dat, gzfile(p), row.names = FALSE)
   }
-  
   
   rm(list = c('compile.data'), envir = .GlobalEnv)
 
