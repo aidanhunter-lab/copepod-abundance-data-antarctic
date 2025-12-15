@@ -18,7 +18,27 @@ In the interest of reproducability, the raw, unprocessed data sets are included 
 Code scripts were written in R version 4.5.2.
 
 #### Packages
-* Requried R packages and the version numbers used:
-+ Cairo 1.6.2, cowplot 1.1.3, data.table 1.17.0, dplyr 1.1.4, ggh4x 0.3.1, ggplot2 3.5.2, ggpmisc 0.6.2, ggnewscale 0.5.1, ggpp 0.5.9, ggrepel 0.9.6, ggtext 0.1.2, ggthemes 5.1.0, patchwork 1.3.0, R.utils 2.13.0, RColorBrewer 1.1.3, reshape2 1.4.4, sf 1.0.20, sp 2.2.0.
-* Other software dependencies (needed only for ploting a map of the data) and the version numbers used:
-+ GEOS 3.10.2, GDAL 3.4.1, PROJ 8.2.1.
+Requried R packages and the version numbers used:
+* Cairo 1.6.2
+* cowplot 1.1.3
+* data.table 1.17.0
+* dplyr 1.1.4
+* ggh4x 0.3.1
+* ggplot2 3.5.2
+* ggpmisc 0.6.2
+* ggnewscale 0.5.1
+* ggpp 0.5.9
+* ggrepel 0.9.6
+* ggtext 0.1.2
+* ggthemes 5.1.0
+* patchwork 1.3.0
+* R.utils 2.13.0
+* RColorBrewer 1.1.3
+* reshape2 1.4.4
+* sf 1.0.20
+* sp 2.2.0.
+
+Other software dependencies (needed only for ploting a map of the data) and the version numbers used:
+* GEOS 3.10.2
+* GDAL 3.4.1
+* PROJ 8.2.1.
