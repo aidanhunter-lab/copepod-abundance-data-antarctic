@@ -17,7 +17,7 @@ if(!grepl(dir.project.R, getwd())){
 #' The `clean.data()` function loads original, raw data sets, cleans them, then
 #' saves output tables (with '_cleaned' appended to the file name) into the
 #' directories holding the original data.
-source('functions/clean copepod occurrence records.R')
+source('functions/clean_copepod_occurrence_records.R')
 clean.data()
 
 # Compile -----------------------------------------------------------------
@@ -38,7 +38,7 @@ clean.data()
 #' 'Calanoides acutus_Calanus propinquus'. This feature is somewhat redundant as
 #' species can simply be filtered out from the complete copepod data set.
 
-source('functions/compile copepod occurrence records.R')
+source('functions/compile_copepod_occurrence_records.R')
 compile.data(species.selection = 'copepods')
 
 # Plot --------------------------------------------------------------------
@@ -54,7 +54,7 @@ compile.data(species.selection = 'copepods')
 #' a print-out of basic data summary stats. The plots saved to disk may be easier
 #' to view because font sizes are not fixed by the R session.
 
-source('functions/plot copepod occurrence records.R')
+source('functions/plot_copepod_occurrence_records.R')
 plot.data(return.plots = TRUE, display.summary.stats = TRUE)
 
 
