@@ -13,14 +13,7 @@ compile.data <- function(species.selection = NULL,
   # Load packages -----------------------------------------------------------
   library(data.table)
   library(dplyr)
-  # library(sf)
-  # library(ggplot2)
-  # library(ggnewscale) # look at previous scripts to see which version to install
-  # library(cowplot)
-  # library(ggrepel)
-  # library(rgbif)
-  # library(this.path)
-  
+
   # Set directories ---------------------------------------------------------
   # setwd(this.dir())
   dir.root <- dirname(getwd())
@@ -66,9 +59,9 @@ compile.data <- function(species.selection = NULL,
   # Source functions --------------------------------------------------------
   # Load all .R files from 'functions' directory into global environment
   
-  omit.funs <- c('clean copepod occurrence records.R',
-                 'compile copepod occurrence records.R',
-                 'plot copepod occurrence records.R')
+  omit.funs <- c('clean_copepod_occurrence_records.R',
+                 'compile_copepod_occurrence_records.R',
+                 'plot_copepod_occurrence_records.R')
   R_functions <- list.files(dir.functions, pattern = "*.R$", ignore.case = TRUE)
   R_functions <- R_functions[!R_functions %in% omit.funs]
   get.functions <- function(dir, n, e){

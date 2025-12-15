@@ -1,32 +1,38 @@
-# Get southern hemisphere map data
+#' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' Get southern hemisphere map data from shape files and plot
+#' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 getMapData <- function(
     dataDirectory,
     fileNames = list(coastline = 'ne_10m_coastline.shp.gz',
                      land = 'ne_10m_land.shp.gz',
-                     ocean = 'ne_10m_ocean.shp',
+                     ocean = 'ne_10m_ocean.shp.gz',
                      iceshelf = 'ne_10m_antarctic_ice_shelves_polys.shp.gz'),
     lon_lim = c(-180, 180), lat_lim = c(-90, 90), hemisphere = NULL, crs = NULL,
     res = NULL, createGrid = FALSE, grid.border.ice.or.land = 'ice',
     removeFrac = 0.05, returnPlot = FALSE, verbose = FALSE,
     loadFromFile = FALSE, autoSave = TRUE, map_colour = NULL, map_linewidths = NULL
 ){
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  # Load and return map data as a spatial data frame.
-  # Default arguments return entire southern hemisphere.
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #' This function loads map data, returns it as a spatial data frame along with
+  #' a map plot.
+  #' As the function was exported from a larger project, some of the arguments
+  #' are redundant and should not be changed. The only necessary argument is
+  #' `dataDirectory`, which points to the directory containing the map shape
+  #' files specified by `fileNames`.
+  #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   # Load packages & set directories -----------------------------------------
-  # Error handle inappropriate arguments
+  #' Error handle inappropriate arguments
   if(!is.null(hemisphere) & !{hemisphere %in% c('north','south')})
     error("If hemisphere is specified then it must be either 'north' or 'south'")
   
-  # Required packages
+  #' Required packages
   library(R.utils)
   library(sf)
   library(sp)
 
-  # Specify directories of stored shape files
+  #' Specify directories of stored shape files
   if(!dir.exists(dataDirectory)) stop(paste0('Specified dataDirectory (', dataDirectory, ') does not exist!'))
   subDirectories <- basename(list.dirs(dataDirectory))
   subDirectories <- subDirectories[subDirectories != basename(dataDirectory)]
@@ -47,7 +53,8 @@ getMapData <- function(
     iceshelfFile  <- paste(dataDirectory, iceDir,   fileNames$iceshelf,  sep = '/')
   }
   
-  # Processed map data is saved into 'temp' directory within the current working directory
+  #' Processed map data is saved into 'temp' directory within the current
+  #' working directory
   filePath <- paste(getwd(), 'temp', sep = '/')
   if({autoSave | loadFromFile} & !filePath %in% list.dirs(getwd())) dir.create(filePath)
   fileName_map <- paste('map data',
@@ -80,7 +87,7 @@ getMapData <- function(
   
   # Create map --------------------------------------------------------------
   if(!mapIsLoaded){
-    # Load the data
+    #' Load the data
     load.shape.file <- function(n, q = !verbose){
       m <- nchar(n)
       is.gz.compressed <- substr(n, m-2, m) == '.gz'
@@ -99,7 +106,7 @@ getMapData <- function(
     land <- land[!is.na(land$featurecla),]
     iceshelf <- iceshelf[!is.na(iceshelf$featurecla),]
     
-    # Merge data into single data frame
+    #' Merge data into single data frame
     land      <- land[c('featurecla')]
     iceshelf  <- iceshelf[c('featurecla')]
     coastline <- coastline[c('featurecla')]
@@ -111,20 +118,20 @@ getMapData <- function(
     
     dat <- st_make_valid(dat)
     
-    # Set the coordinate reference system (CRS)
+    #' Set the coordinate reference system (CRS)
     crs_base <- st_crs(dat)
     if(is.null(crs)){
       if(!is.null(hemisphere) && hemisphere == 'south') crs <- 6932
     }
     if(is.numeric(crs)) crs <- st_crs(crs)
     
-    # Create map bounding line
+    #' Create map bounding line
     londiff <- diff(lon_lim)
     latdiff <- diff(lat_lim)
     londiff10 <- 10 * londiff
     latdiff10 <- 10 * latdiff
     if(londiff == 360){
-      # circumpolar map
+      #' circumpolar map
       mapLimit_line <- matrix(c(seq(lon_lim[1], lon_lim[2], length.out = londiff10),
                                 rep(lat_lim[2], londiff10)),
                               ncol = 2, dimnames = list(NULL, c('Longitude','Latitude')))
@@ -145,30 +152,30 @@ getMapData <- function(
     mapLimit_line <- st_linestring(mapLimit_line, dim = 'XY')
     mapLimit_line <- st_sf(st_as_sfc(list(mapLimit_line), crs = crs_base))
     st_geometry(mapLimit_line) <- 'geometry'
-    mapLimit_line <- st_transform(mapLimit_line, crs = crs) # transform to map coordinates
+    mapLimit_line <- st_transform(mapLimit_line, crs = crs) #' transform to map coordinates
     mapLimit_poly <- st_cast(mapLimit_line, 'POLYGON')
     
-    # Change to polar coords
+    #' Change to polar coordinates
     dat <- st_transform(dat, crs = crs)
-    # Crop map data to within boundary
+    #' Crop map data to within boundary
     crop.map <- function(x,y,verbose=FALSE) if(!verbose) suppressWarnings(st_intersection(x, y)) else st_intersection(x, y)
     dat <- crop.map(mapLimit_poly, dat, verbose)
     # ggplot() + geom_sf(data = subset(dat, feature == 'land'), fill = 'darkgreen') + geom_sf(data = subset(dat, feature == 'ice'), fill = 'lightblue') + geom_sf(data = subset(dat, feature == 'coastline'), colour = 'black')
     
-    # Include map boundary line in dat
+    #' Include map boundary line in `dat`
     mapLimit_line$feature <- 'boundary'
     mapLimit_line <- mapLimit_line[c('feature', 'geometry')]
     dat <- rbind(dat, mapLimit_line)
     
     rm(mapLimit_line)
 
-    # Create an ocean polygon. First, one that borders ice shelves, then another
-    # that borders land to exclude ice from the map.
+    #' Create an ocean polygon. First, one that borders ice shelves, then another
+    #' that borders land to exclude ice from the map.
 
-    # It's tricky to eliminate narrow edges between adjacent polygons...
-    # The land and ice polygons are not perfectly aligned so ocean can creep into
-    # the gaps. Solve this by expanding the coastline points into tiny polygons then
-    # merging all polygons to mask all dry regions.
+    #' It's tricky to eliminate narrow edges between adjacent polygons...
+    #' The land and ice polygons are not perfectly aligned so ocean can creep
+    #' into the gaps. Solve this by expanding the coastline points into tiny
+    #' polygons then merging all polygons to mask all dry regions.
     coastline <- subset(dat, feature == 'coastline')
     coastline <- lapply(1:nrow(coastline), function(z) suppressWarnings(st_cast(coastline[z,], 'LINESTRING')))
     coastline <- do.call('rbind', coastline)
@@ -215,7 +222,7 @@ getMapData <- function(
   }
   
   # Create grid -------------------------------------------------------------
-  # Define map grid using resolution 'res'
+  #' Define map grid using resolution `res`
   made_grid <- FALSE
   if(!gridIsLoaded){
     if(createGrid){
@@ -235,7 +242,7 @@ getMapData <- function(
           map_grid <- st_make_grid(bb, cellsize = res)
           map_grid <- st_sf(map_grid)
           st_geometry(map_grid) <- 'geometry'
-          # Get grid cell mid points (not centroids, but midway between lat-lon bounds)
+          #' Get grid cell mid points (not centroids, but midway between lat-lon bounds)
           get.centroids <- function(x, verbose=FALSE) if(!verbose) suppressWarnings(st_centroid(x)) else st_centroid(x)
           cell_centroids <- get.centroids(map_grid, verbose)
           centroid_coords <- st_coordinates(cell_centroids)
@@ -249,25 +256,25 @@ getMapData <- function(
             colnames(y) <- rbind(c('centroid_lon_true','centroid_lat_true'), c('centroid_x_true','centroid_y_true'), c('centroid_x_box','centroid_y_box'))[rep(type, 3) == c('lat_lon','xy','xy.box'),]
             cbind(x, as.data.frame(y))}
           map_grid <- include.centroids(map_grid, centroid_coords, type = 'xy.box')
-          map_grid <- st_transform(map_grid, crs = crs) # grid covers entire map domain
+          map_grid <- st_transform(map_grid, crs = crs) #' grid covers entire map domain
           
           map_grid <- st_make_valid(map_grid)
           
-          # Adjust grid to remove (portions of) cells masked by land/ice
+          #' Adjust grid to remove (portions of) cells masked by land/ice
           grid.adjust <- function(x,y,verbose=FALSE) if(!verbose) suppressWarnings(st_difference(x, y)) else st_difference(x, y)
           mask.2ice <- grid.adjust(mapLimit_poly, subset(dat, feature == 'ocean.bordersIce'), verbose)
           mask.2land <- grid.adjust(mapLimit_poly, subset(dat, feature == 'ocean.bordersLand'), verbose)
           map_grid.2ice <- grid.adjust(map_grid, mask.2ice, verbose)
           map_grid.2land <- grid.adjust(map_grid, mask.2land, verbose)
           
-          # Get true grid cell centroids (post cropping) and grid cell areas
+          #' Get true grid cell centroids (post cropping) and grid cell areas
           cell_centroids.2ice <- get.centroids(map_grid.2ice, verbose)
           cell_centroids.2land <- get.centroids(map_grid.2land, verbose)
           centroid_coords.2ice <- st_coordinates(cell_centroids.2ice)
           centroid_coords.2land <- st_coordinates(cell_centroids.2land)
           map_grid.2ice <- include.centroids(map_grid.2ice, centroid_coords.2ice, type = 'xy')
           map_grid.2land <- include.centroids(map_grid.2land, centroid_coords.2land, type = 'xy')
-          # Convert CRS to standard map projection, and convert geometry to polygons
+          #' Convert CRS to standard map projection, and convert geometry to polygons
           map_grid.2ice <- st_transform(map_grid.2ice, crs = crs_base)
           map_grid.2land <- st_transform(map_grid.2land, crs = crs_base)
           cast.grid.2.polygon <- function(x){
@@ -297,17 +304,21 @@ getMapData <- function(
           map_grid.2ice <- st_transform(map_grid.2ice, crs = crs)
           map_grid.2land <- st_transform(map_grid.2land, crs = crs)
           
-          # Omit tiny cells that may appear within intricate coastline. Remove cells that
-          # are smaller than 0<removeFrac<1 of their expected (uncropped) area.
+          #' Omit tiny cells that may appear within intricate coastline. Remove
+          #' cells that are smaller than 0<`removeFrac`<1 of their expected
+          #' (uncropped) area.
           lat_include.2ice <- lat_mids %in% map_grid.2ice$mid_lat_box[map_grid.2ice$feature == 'ocean.bordersIce']
           lat_include.2land <- lat_mids %in% map_grid.2land$mid_lat_box[map_grid.2land$feature == 'ocean.bordersLand']
           # lat_expected <- seq(lat_lim[1] + 0.5 * res['lat'], lat_lim[2] - 0.5 * res['lat'], res['lat'])
-          # # There are (were: centroids no-longer used) computational errors that creep in to map transforms, so the mapped latitudes are not exactly as expected.
+          
+          #' There are (were: centroids no-longer used) computational errors
+          #' that creep in to map transforms, so the mapped latitudes are not
+          #' exactly as expected.
           # lat_diff <- abs(outer(map_grid$mid_lat_box, lat_expected, '-'))
           # lat_include <- apply(lat_diff, 2, function(z) any(z < 0.5 * res['lat']))
           # lat_diff <- lat_diff[,lat_include]
 
-          j <- list(sum(lat_include.2ice), sum(lat_include.2land)) # number of expected areas to calculate (if cell area varied only with latitude)
+          j <- list(sum(lat_include.2ice), sum(lat_include.2land)) #' number of expected areas to calculate (if cell area varied only with latitude)
           y_ <- list(lat_mids[lat_include.2ice], lat_mids[lat_include.2land])
           x_ <- lapply(1:2, function(z) rep(0, length(y_[[z]])))
           x <- lapply(1:2, function(z) outer(x_[[z]], 0.5 * c(-1,1) * res['lon'], '+'))
@@ -338,9 +349,11 @@ getMapData <- function(
           map_grid.2ice <- map_grid.2ice[!remove.ice,]
           map_grid.2land <- map_grid.2land[!remove.land,]
 
-          # Put grid cells in order
+          #' Put grid cells in order
           rowOrder <- function(x) order(x$mid_lat_box, x$mid_lon_box, decreasing = FALSE)
-          colOrder <- c('feature','mid_lon_box','mid_lat_box','centroid_x_box','centroid_y_box', 'centroid_lon_true','centroid_lat_true','centroid_x_true','centroid_y_true','area_km2','geometry')
+          colOrder <- c('feature','mid_lon_box','mid_lat_box','centroid_x_box',
+                        'centroid_y_box', 'centroid_lon_true','centroid_lat_true',
+                        'centroid_x_true','centroid_y_true','area_km2','geometry')
           map_grid.2ice <- map_grid.2ice[rowOrder(map_grid.2ice),colOrder]
           map_grid.2land <- map_grid.2land[rowOrder(map_grid.2land),colOrder]
 
@@ -396,7 +409,6 @@ getMapData <- function(
     if(is.null(map_linewidths)){
       map_linewidths = c(coastline = 0.1, boundary = 1, grid = 0.1)}
 
-    # if(exists('plotMap', .GlobalEnv)){
     if(exists('plotMap')){
         output$map_plot <- plotMap(dat,map_colour = map_colour,
                                  map_linewidths = map_linewidths)
@@ -427,9 +439,9 @@ getMapData <- function(
   
   # Save --------------------------------------------------------------------
   if(autoSave){
-    # Save map data into 'temp' directory within current directory
+    #' Save map data into 'temp' directory within current directory
     if(!mapIsLoaded) saveRDS(dat, fullFile_map)
-    # Save the grid
+    #' Save the grid
     if(made_grid){
       if(!gridIsLoaded){
         saveRDS(map_grid.2ice, fullFile_grid.2ice)

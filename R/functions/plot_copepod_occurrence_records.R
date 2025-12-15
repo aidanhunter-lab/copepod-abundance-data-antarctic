@@ -42,9 +42,9 @@ plot.data <- function(
 
   # Load functions ----------------------------------------------------------
 
-  omit.funs <- c('clean copepod occurrence records.R',
-                 'compile copepod occurrence records.R',
-                 'plot copepod occurrence records.R')
+  omit.funs <- c('clean_copepod_occurrence_records.R',
+                 'compile_copepod_occurrence_records.R',
+                 'plot_copepod_occurrence_records.R')
   R_functions <- list.files(dir.functions, pattern = "*.R$", ignore.case = TRUE)
   R_functions <- R_functions[!R_functions %in% omit.funs]
   get.functions <- function(dir, n, e){
