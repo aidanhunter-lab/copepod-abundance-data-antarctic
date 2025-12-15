@@ -2,11 +2,11 @@
 
 ## Overview
 <img src="misc/BIOPOLE_Logo_Colour.png" align="right" width="200">
-This repository contains the code to required reproduce the compiled dataset of copepod prevalence measurements stored at the Polar Data Centre (doi link) and detailed in the associated publication <i>A database of copepod prevalence in the Southern Ocean</i> (citation).
+This repository contains the code to required reproduce the compiled dataset of copepod prevalence measurements stored at the UK Polar Data Centre (doi link) and detailed in the associated publication <i>A database of copepod prevalence in the Southern Ocean</i> (citation).
 The study objective was to unify disparate datasets of Southern Ocean copepod abundance into a single data product adhering to the FAIR principles for scientific data.
 This work is output from the <a href="https://biopole.ac.uk/">BIOPOLE</a> project, supported by National Capability Multicentre Round 2 funding from the Natural Environment Research Council (grant no. NE/W004933/1)
 
-## Code summary
+## Code details
 #### Scripts
 Code scripts are contained in the `R` directory. The entire procedure for cleaning and compiling the data, and producing some output plots & summary statistics, is implemented through `run_data_prep.R`, which is the only script that needs to be opened. This simple script sources three functions, contained in the `R/functions` directory, that should be run in succession to clean the original data, compile it into a single table, then produce plots.
 
