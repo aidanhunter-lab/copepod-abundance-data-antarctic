@@ -58,5 +58,3 @@ source('functions/plot_copepod_occurrence_records.R')
 plot.data(return.plots = TRUE, display.summary.stats = TRUE)
 
 
-
-

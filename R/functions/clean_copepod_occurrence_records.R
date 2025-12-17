@@ -5,7 +5,7 @@
 #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
-                       clear.on.completeion = TRUE, propRecords2Keep = 0.8,
+                       clear.on.completeion = TRUE, propRecords2Keep = 1,
                        auto.select.data.sets = TRUE
 ){
   
@@ -424,14 +424,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   sex <- tolower(sex)
   isUnspecifiedSex <- isUnspecifiedSex | 
     sex %in% c('i', 'unknown', 'juvenile', 'undetermined', 'intersex', '`', 'j',
-               'u', 'female;unknown')
+               'u', 'female;unknown', 'mixed')
   sex[isUnspecifiedSex] <- 'unknown'
   sex <- gsub(';', '', sex)
-  isMale <- sex == 'm' | sex == 'male'
+  isMale <- sex %in% c('m', 'male', 'male male')
   sex[isMale] <- 'male'
-  isFemale <- sex == 'f' | sex == 'female'
+  isFemale <- sex %in% c('f', 'female', 'female female')
   sex[isFemale] <- 'female'
-  isMaleAndFemale <- sex == 'male female' | sex == 'female male'
+  isMaleAndFemale <- !{sex %in% c('unknown', 'male', 'female')}
   sex[isMaleAndFemale] <- 'male and female'
   #' Check updated names
   # d <- unique(data.frame(old = dat$sex, new = sex))
@@ -646,11 +646,17 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   if(any(i)){
     eventDate[i] <- format(strptime(eventDate[i], format = fr), fr) 
   }
-  i <- nchar(eventDate) == 9 # Y-m-d or d/m/y
+  i <- nchar(eventDate) == 9 # Y-m-d or d/m/y or y/y
   if(any(i)){
     j <- grepl('-', eventDate)
     eventDate[i&j] <- format(strptime(eventDate[i&j], format = fr), fr)
     j <- grepl('/', eventDate)
+    j <- j & sapply(gregexpr('/', eventDate), length) == 1
+    x <- strsplit(eventDate[i&j], '/')
+    eventStart[i&j] <- sapply(x, function(z) z[1])
+    eventEnd[i&j] <- sapply(x, function(z) z[2])
+    j <- grepl('/', eventDate)
+    j <- j & sapply(gregexpr('/', eventDate), length) == 2
     eventDate[i&j] <- format(strptime(eventDate[i&j], format = '%d/%m/%Y'), fr)
   }
   i <- nchar(eventDate) == 10 # Y-m-d or d/m/y
@@ -1034,7 +1040,6 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   #' Order by time
   #' ~~~~~~~~~~~~~
   dat <- as.data.frame(dat)
-  dat$geometry <- NULL
   dat <- dat[order(dat$date_mid, dat$time_mid, dat$time_start),]
   
   #' ~~~~~~~~~~~~~~~~~~~
@@ -1106,21 +1111,6 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   noYrMonDay <- is.na(dat$year) & is.na(dat$month) & is.na(dat$day)
   noDate <- is.na(dat$eventDate) | dat$eventDate == ''
   noDate <- noDate & noYrMonDay  #' missing dates
-  dat$verbatimEventDate <- gsub('- ', '', dat$verbatimEventDate) #' verbatim dates are cumbersome but usable
-  dat$verbatimEventDate <- gsub('-', '', dat$verbatimEventDate)
-  dat$verbatimEventDate <- gsub(' 1', '_1', dat$verbatimEventDate)
-  dat$verbatimEventDate <- gsub(' 2', '_2', dat$verbatimEventDate)
-  dat$verbatimEventDate <- gsub(' ', '', dat$verbatimEventDate)
-  dat$verbatimEventDate <- gsub('_', ' ', dat$verbatimEventDate)
-  dat$verbatimEventDate <- gsub('unknown', '', dat$verbatimEventDate)
-  infillVerbatimDate <- noDate & !dat$verbatimEventDate == ''
-  y <- as.numeric(substr(dat$verbatimEventDate, nchar(dat$verbatimEventDate)-3, nchar(dat$verbatimEventDate)))
-  m <- tolower(substr(dat$verbatimEventDate, 1, 3))
-  m <- outer(m, tolower(month.abb), '==')
-  m <- apply(m, 1, which.max)
-  dat$year[infillVerbatimDate] <- y[infillVerbatimDate]
-  dat$month[infillVerbatimDate] <- m[infillVerbatimDate]
-  noDate <- noDate & !infillVerbatimDate
   omitRecords <- noName | noPosition | noDepth | noDate
   dat <- dat[!omitRecords,]
   
@@ -1229,7 +1219,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$sex[!knownSex & lifeStage %in% c('cf','cf.')]  <- 'female'
   lifeStage[lifeStage %in% c('cf','cf.')] <- 'adult'
   knownSex <- dat$sex != 'unknown'
-  unique(lifeStage[knownSex])
+  # unique(lifeStage[knownSex])
   lifeStage[isUnspecifiedLifeStage & knownSex] <- 'adult'
   isUnspecifiedLifeStage <- lifeStage == 'unspecified'
   
@@ -1319,8 +1309,8 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   
   message('\n', "Standardise 'date/time'")
   
-  names(dat)[grepl('date', names(dat), ignore.case = TRUE)]
-  names(dat)[grepl('time', names(dat), ignore.case = TRUE)]
+  # names(dat)[grepl('date', names(dat), ignore.case = TRUE)]
+  # names(dat)[grepl('time', names(dat), ignore.case = TRUE)]
   
   eventDate <- dat$eventDate
   eventTime <- dat$eventTime
@@ -1358,6 +1348,18 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   i <- 14 #' H:M:S+H:M
   j <- nchar(eventTime) == i
   k <- {i0 | i12} & j # no values
+  if(any(k)){
+    y <- strsplit(eventTime[k], '\\+')
+    adj <- sapply(y, function(z) z[2])
+    adj <- sapply(strsplit(adj, ':'), function(z){
+      u <- as.numeric(z)
+      h <- u[1]
+      m <- u[2]
+      h*60^2 + m*60})
+    y <- sapply(y, function(z) z[1])
+    eventTime[k] <- format(strptime(y, format = '%H:%M:%S') + adj, '%H:%M:%S')
+    x[k] <- eventTime[k]
+  }
   i <- 17 #' H:M:S \\ H:M:S
   j <- nchar(eventTime) == i
   k <- {i0 | i12} & j
@@ -5903,6 +5905,8 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   
   # Save cleaned data -------------------------------------------------------
   
+  default.propRecords2Keep <- 1
+  
   if(save.cleaned.data){
     for(Source in names(DATA)){
       m <- paste('Saving', Source, 'data')
@@ -5915,6 +5919,11 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
       }else{
         f <- 'all_data_tables_cleaned.csv.gz'
       }
+      
+      if(propRecords2Keep != default.propRecords2Keep){
+        f <- gsub('.csv.gz', paste0('_propKeep', propRecords2Keep, '.csv.gz'), f)
+      }
+      
       p <- dir.data.all[[Source]] #' directory path
       p <- file.path(p, f) #' full path
       write.csv(d, gzfile(p), row.names = FALSE) #' save cleaned data
