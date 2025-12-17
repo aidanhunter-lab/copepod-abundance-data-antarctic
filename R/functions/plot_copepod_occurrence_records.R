@@ -133,7 +133,9 @@ plot.data <- function(
   d$Sample.Gear <- gsub('Unspecified gear', 'Unspecified', d$Sample.Gear)
   d$Sample.Gear <- gsub('Sligsby-Gorbunov', 'S-G', d$Sample.Gear)
   d$Sample.Gear <- gsub('Modified NIPR-1', 'MNIPR-1', d$Sample.Gear)
-
+  d$Sample.Gear <- gsub('hand collected', 'HC', d$Sample.Gear)
+  d$Sample.Gear <- gsub('Discovery N70', 'DN70', d$Sample.Gear)
+  
   d <- d %>%
     rename(Group = Sample.Gear) %>%
     rename(Group.Long = Sample.Gear.Long) %>%
@@ -145,19 +147,21 @@ plot.data <- function(
   ngroup <- length(unique(d$Group))
   
   col.pal <- colorblind_pal()
-  ncolour <- 7 #' maximum number of colours handled by selected palette
-  group.colour <- col.pal(ncolour+1)[-1] #' exclude black because over-plotting sometimes appears as filled shapes
+  ncolour.max <- 7 #' maximum number of colours handled by selected palette
+  group.colour <- col.pal(ncolour.max+1)[-1] #' exclude black because over-plotting sometimes appears as filled shapes
   
   #' Use a clustering algorithm to determine which gear types tend to be close
   #' to each other, then, as far as possible, assign different colours & shapes
   #' to nearby gears.
-  ncluster <- ceiling(ngroup / ncolour)
+  ncluster <- ceiling(ngroup / ncolour.max)
   ncolour <- ceiling(ngroup / ncluster) #' reduce number of colours if possible
   
-  #' Sort colours from light to dark, keeping similar colours separate and
+  #' Sort colours from light to dark, keeping similar colours separate then
   #' removing colours if possible
+  group.colour <- group.colour[c(4,2,7,1,3,6,5)]
   # plot(1:7, 1:7, col = group.colour, pch = 16, cex = 4)
-  group.colour <- group.colour[c(4,2,7,3,6,5)]
+  col.rem <- c(4,5,2,1,3,6,7)
+  if(ncolour.max > ncolour) group.colour <- group.colour[-head(col.rem, ncolour.max - ncolour)]
   # plot(1:ncolour, 1:ncolour, col = group.colour, pch = 16, cex = 4)
   group.shape <- c(3,2,4,6,1,5) #' choose plotting shapes
   
@@ -284,7 +288,7 @@ plot.data <- function(
   #' Save the plot
   
   if(save.plots){
-    plt.name <- 'map.png'
+    plt.name <- 'map2.png'
     wd <- 16
     ht <- 0.7 * wd
     
@@ -331,7 +335,7 @@ plot.data <- function(
   d.plt$label <- ''
   #' Select some species names to display, including the `nlab` most sampled
   nlab <- 10
-  i <- unique(c(head(seq(50, nrow(d.plt), 50), -1),
+  i <- unique(c(head(seq(100, nrow(d.plt), 100), -1),
                 {nrow(d.plt) - nlab + 1}:nrow(d.plt)))
   d.plt$label[i] <- as.character(d.plt$Species[i])
   
@@ -340,7 +344,11 @@ plot.data <- function(
   xnud[tail(i, nlab)] <- -xnud[tail(i, nlab)]
   ynud <- rep(0, nrow(d.plt))
   
-  xbrk <- c(1, seq(50, nrow(d.plt), 50), nrow(d.plt))
+  xinc <- 50
+  xbrk <- c(1, seq(xinc, nrow(d.plt), xinc)) # , nrow(d.plt))
+  if(nrow(d.plt) - tail(xbrk, 1) < 0.5*xinc){
+    xbrk <- c(head(xbrk, -1), nrow(d.plt))}else{
+      xbrk <- c(xbrk, nrow(d.plt))}
   
   plt.species.1 <- ggplot(data = d.plt,
                         mapping = aes(x = index, y = number, label = label)) + 
@@ -373,8 +381,13 @@ plot.data <- function(
   #' position the less sampled species (relatively easily)
   d.lab$x[!i] <- d.lab$x[!i] + 0.4 * d.lab$n[!i] # + 30
   d.lab$y[!i] <- d.lab$y[!i] - 0.5 * d.lab$number[!i]
+  
+  #' Reconfigure an awkward label
+  d.lab$label[d.lab$label == 'Euchirella rostrata'] <- 'Euchirella\nrostrata'
+  
+  
   #' position the top ten sampled species
-  d.lab$x[i] <- d.lab$x[i] - 0.5 * d.lab$n[i] - seq(20, 100, length.out = sum(i))
+  d.lab$x[i] <- d.lab$x[i] - 0.5 * max(d.lab$n[i]) - seq(20, 100, length.out = sum(i))
   j <- log10(rev(range(d.lab$number[i])))
   pad <- 0.6
   k <- pad * abs(diff(j))
@@ -405,7 +418,9 @@ plot.data <- function(
   j <- strsplit(x[xn], ' ')
   j <- sapply(j, function(z){
     y <- paste(paste0('_', z, '_'), collapse = ' ')
-    gsub(' ', '<span style="color:white">.</span>' , y)})
+    y <- gsub(' ', '<span style="color:white">.</span>' , y)
+    y <- gsub('\n', '<br>', y)
+    y})
   x[xn] <- j
   
   d.lab$label <- x
@@ -504,12 +519,13 @@ plot.data <- function(
   #' position the less sampled species (relatively easily)
   d.lab$x[!i] <- d.lab$x[!i] + 0.5 * d.lab$n[!i]
   d.lab$y[!i] <- d.lab$y[!i] - 0.5 * d.lab$number[!i]
-  #' manually adjust an awkward name
-  d.lab$x[head(which(!i),1)] <- d.lab$x[head(which(!i),1)] - 6
-  # d.lab$y[head(which(!i),1)] <- d.lab$y[head(which(!i),1)] * 0.45
+  
+  #' #' manually adjust an awkward name
+  # d.lab$x[head(which(!i),1)] <- d.lab$x[head(which(!i),1)] - 6
+  # # d.lab$y[head(which(!i),1)] <- d.lab$y[head(which(!i),1)] * 0.45
   
   #' position the top ten sampled species
-  d.lab$x[i] <- d.lab$x[i] - 0.5 * d.lab$n[i] - seq(1*rw * 20, 1.5*rw * 100, length.out = sum(i))
+  d.lab$x[i] <- d.lab$x[i] - 1 * max(d.lab$n[i]) - seq(1*rw * 20, 1.5*rw * 100, length.out = sum(i))
   j <- log10(rev(range(d.lab$number[i])))
   pad <- 0.5
   k <- pad * abs(diff(j))
@@ -582,7 +598,8 @@ plot.data <- function(
   yr2 <- suppressWarnings(ggplot_build(plt.species.4)$layout$panel_params[[1]]$y.range)
   yr <- c(max(c(yr1[1], yr2[1])), max(c(yr1[2], yr2[2])))
   
-  #' Make plot widths relative to number of species
+  #' Make plot widths relative to number of species, ensuring that neither plot
+  #' is too narrow
   x <- d %>% select(Species, Single.Species) %>% distinct()
   w <- c(sum(x$Single.Species), sum(!x$Single.Species))
   
@@ -611,6 +628,11 @@ plot.data <- function(
             axis.text.y = element_blank(),
             plot.margin = unit(rep(0,4),'pt')))
   
+  min.w <- 0.25
+  w <- w / sum(w)
+  if(any(w < min.w)){
+    w[which.min(w)] <- min.w
+    w[which.max(w)] <- 1-min.w}
   plt.species <- plt.species.2.2 - plt.species.4.2 + plot_layout(widths = w)
   
   
@@ -697,13 +719,20 @@ plot.data <- function(
   hj[47] <- 0.4
   hj[54] <- 0.65
   hj[57] <- 0.45
-  hj[62] <- 0.45
+  hj[62] <- 0.4
   hj[63] <- 0.45
   hj[67] <- 0.6
   hj[68] <- 0.4
-  hj[70] <- 0.9
+  hj[69] <- 0.55
+  hj[70] <- 0.6
   hj[71] <- 0.525
   hj[72] <- 0.8
+  
+  vj <- rep(-0.5, 72)
+  vj[67] <- -0.6
+  vj[68] <- -0.4
+  vj[70] <- -0.65
+  vj[71] <- -0.35
   
   plt.copepodite.stage <- ggplot(
     data = d.plt,
@@ -713,7 +742,7 @@ plot.data <- function(
     geom_text(mapping = aes(label = number.of.species, group = Month),
               colour = 'black',
               position = position_dodge(width=d.wid),
-              vjust = -0.5,
+              vjust = vj,
               hjust = hj,
               size = 1.8, angle = 0) +
     scale_fill_manual(values = mon.colour) +
@@ -754,7 +783,7 @@ plot.data <- function(
     plot_layout(ncol = 1, heights = c(0.64,0.36))
   
   if(save.plots){
-    plt.name <- 'species_and_copepodite_stage.png'
+    plt.name <- 'species_and_copepodite_stage2.png'
     wd <- 16
     ht <- 1 * wd
     
@@ -929,14 +958,24 @@ plot.data <- function(
   
   d$Depth <- factor(d$Depth, rev(levels(d$Depth)))
   
+  min.decade <- min(floor(d$Year / 10) * 10)
+  
   d$Decade <- paste0(floor(d$Year / 10) * 10, 's')
   d$Decade <- factor(d$Decade, sort(unique(d$Decade)))
+  
+  #' group the early decades when very few samples were collected
+  lab1 <- paste0(as.character(min.decade), 's', '\U2013', '\n', '\U2013', '1950s')
+  i <- grep('1950', levels(d$Decade))
+  labn <- c(rep(lab1, i), levels(d$Decade)[-{1:i}])
+  d$Decade <- factor(d$Decade, levels(d$Decade),
+                     labels = labn)
+  
   d$Depth2 <- as.character(d$Depth)
   d$Depth2 <- factor(substr(d$Depth2, 1, nchar(d$Depth2) - 2),
                      substr(levels(d$Depth), 1, nchar(levels(d$Depth)) - 2))
   
   ndec <- length(levels(d$Decade))
-  dec.colour <- colorRampPalette(brewer.pal(9, 'YlOrBr'))(ndec)
+  dec.colour <- colorRampPalette(brewer.pal(9, 'YlOrBr'))(ndec+1)[-1]
   dec.colour <- setNames(dec.colour, levels(d$Decade))
   
   d$Decade <- factor(d$Decade, rev(levels(d$Decade)))
@@ -988,7 +1027,7 @@ plot.data <- function(
   # print(plt.time.depth)
   
   if(save.plots){
-    plt.name <- 'sample_years_and_depths.png'
+    plt.name <- 'sample_years_and_depths2.png'
     wd <- 16
     ht <- 0.7 * wd
     
