@@ -57,6 +57,9 @@ plot.data <- function(
   dat <- read.csv(gzfile(file.path(dir.data.compiled, data.file)))
   
   # Set global plot theme ---------------------------------------------------
+  background.colour <- 'white'
+  # background.colour <- 'transparent'
+  
   theme_set(
     theme_bw() + 
       theme(
@@ -66,7 +69,10 @@ plot.data <- function(
         strip.background = element_blank(),
         axis.ticks = element_line(linewidth = 0.3),
         panel.grid = element_line(linewidth = 0.3),
-        axis.text.y = element_text(angle = 90, hjust = 0.5)
+        axis.text.y = element_text(angle = 90, hjust = 0.5),
+        panel.background = element_rect(fill = background.colour, colour = NA),
+        plot.background = element_rect(fill = background.colour, colour = NA),
+        legend.background = element_rect(fill = background.colour)
       ))
   
   # Map plot ----------------------------------------------------------------
@@ -442,7 +448,8 @@ plot.data <- function(
     geom_richtext(data = d.lab %>% filter(!is.na(label)),
                   mapping = aes(x = x, y = y, label = label, hjust = hjust),
                   label.padding = unit(0, 'pt'), label.margin = unit(0, 'pt'),
-                  label.colour = 'white', size = 3) +
+                  label.colour = background.colour, fill = background.colour,
+                  size = 3) +
     geom_point(size = 10, shape = '.') + 
     xlab('Species index') +
     ylab('Sample events') + 
@@ -451,7 +458,9 @@ plot.data <- function(
     scale_y_continuous(transform = 'log10', breaks = ybrk) + 
     geom_label_npc(data = d.lab[1,],
                    mapping = aes(npcx = ann.x, npcy = ann.y, label = group),
-                   family = 'serif', label.size = 0#, label.padding = unit(1,'cm')
+                   family = 'serif', label.size = 0,
+                   fill = background.colour
+                   #, label.padding = unit(1,'cm')
     ) +
     theme(panel.grid.minor = element_blank(),
           panel.grid.major.x = element_blank(),
@@ -474,8 +483,15 @@ plot.data <- function(
   d.plt$label <- ''
   #' Select some species names to display, including the `nlab` most sampled
   nlab <- 10
-  xj <- ceiling(n[1] / 50) * 50 - n[1]
-  i <- unique(c(head(seq(xj, nrow(d.plt), 50), -1), {nrow(d.plt) - nlab + 1}:nrow(d.plt)))
+  
+  # xj <- ceiling(n[1] / 50) * 50 - n[1]
+  # i <- unique(c(head(seq(xj, nrow(d.plt), 50), -1), {nrow(d.plt) - nlab + 1}:nrow(d.plt)))
+  
+  # xj <- ceiling(n[1] / 100) * 100 - n[1]
+  # i <- unique(c(seq(xj, nrow(d.plt), 100), {nrow(d.plt) - nlab + 1}:nrow(d.plt)))
+  
+  i <- unique(c({nrow(d.plt) - nlab + 1}:nrow(d.plt)))
+  
   d.plt$label[i] <- as.character(d.plt$Species[i])
   xnud <- rep(0, nrow(d.plt))
   xnud[i] <- 50
@@ -574,7 +590,8 @@ plot.data <- function(
     geom_richtext(data = d.lab %>% filter(!is.na(label)),
                   mapping = aes(x = x, y = y, label = label, hjust = hjust),
                   label.padding = unit(0, 'pt'), label.margin = unit(0, 'pt'),
-                  label.colour = 'white', size = 3) +
+                  label.colour = background.colour, fill = background.colour,
+                  size = 3) +
     geom_point(size = 10, shape = '.') + 
     xlab('Species index') +
     ylab('Sample events') + 
@@ -582,7 +599,9 @@ plot.data <- function(
     scale_y_continuous(transform = 'log10', breaks = ybrk) + 
     geom_label_npc(data = d.lab[1,],
                    mapping = aes(npcx = ann.x, npcy = ann.y, label = group),
-                   family = 'serif', label.size = 0#, label.padding = unit(1,'cm')
+                   family = 'serif', label.size = 0,
+                   fill = background.colour
+                   #, label.padding = unit(1,'cm')
     ) +
     theme(panel.grid.minor = element_blank(),
           panel.grid.major.x = element_blank(),
@@ -783,15 +802,16 @@ plot.data <- function(
     plot_layout(ncol = 1, heights = c(0.64,0.36))
   
   if(save.plots){
-    plt.name <- 'species_and_copepodite_stage2.png'
+    plt.name <- 'species_and_copepodite_stage3.png'
     wd <- 16
     ht <- 1 * wd
     
     png(filename = file.path(dir.plots, plt.name), width = wd, height = ht,
-        units = 'cm', res = res)
+        units = 'cm', res = res, bg = background.colour)
     suppressWarnings(print(plt.species.stage))
     dev.off()
   }
+  
   
   # Time series of sample events --------------------------------------------
   d <- dat %>% filter(Measurement %in% measures)
@@ -1008,19 +1028,23 @@ plot.data <- function(
   # print(plt.depth)
   
   plt.depth <- plt.depth + facetted_pos_scales(x = list(
-    NULL, NULL, NULL,
+    scale_x_continuous(
+      expand = expansion(mult = c(0, 0.05)),
+      breaks = c(0, 200, 400, 600)),
+  NULL,
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.05)),
+    breaks = c(0, 5000, 10000)),
     scale_x_continuous(
       expand = expansion(mult = c(0, 0.05)),
       breaks = c(0, 20000, 40000))
   ))
-  
+
   plt.depth <- plot_grid(plt.depth, labels = 'C', label_size = 11,
                     label_fontfamily = 'serif', label_fontface = 'plain',
                     label_x = 0.001, label_y = 0.96)
   
   
-  
-
   # Combine plots -- times & depths -----------------------------------------
 
   plt.time.depth <- plot_grid(plt.timeseries, plt.depth, ncol = 1, rel_heights = c(0.45,0.55))

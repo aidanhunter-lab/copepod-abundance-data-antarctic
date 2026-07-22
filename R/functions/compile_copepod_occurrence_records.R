@@ -465,8 +465,6 @@ compile.data <- function(species.selection = NULL,
   dat$Species[i] <- 'Aetideopsis rostrata and Aetideopsis inflata'
   i <- dat$Species == 'A. tonsa'
   dat$Species[i] <- 'Acartia (Acanthacartia) tonsa'
-  
-  
   i <- dat$Species == 'Acartia (acanthacartia) bifilosa'
   dat$Species[i] <- 'Acartia (Acanthacartia) bifilosa'
   i <- dat$Species == 'Acartia (acanthacartia) fossae'
@@ -1437,6 +1435,9 @@ compile.data <- function(species.selection = NULL,
   names(dat)[names(dat) == 'maximumDepthInMeters'] <- 'Depth.Bottom'
   
   #' Error-check
+  j <- dat$Depth.Top < 0 # depths above surface
+  dat$Depth.Top[j] <- 0
+  
   j <- !{is.na(dat$Depth.Top) | is.na(dat$Depth.Bottom)} #' top & bottom depth recorded
   k <- j & dat$Depth.Top > dat$Depth.Bottom #' top recorded as deeper than bottom
   # j <- k & dat$Depth.Top >= dat$Depth & dat$Depth.Bottom <= dat$Depth # depth in between range
@@ -1448,24 +1449,41 @@ compile.data <- function(species.selection = NULL,
   
   dat$depthAccuracy <- NULL
   
-  #' Infill missing depths from top/bottom depths if possible
+  #' Check for records where top/bottom depths are identical to depth, then set
+  #' the top/bottom values to NA
+  j <- is.na(dat$Depth)
+  k <- !is.na(dat$Depth.Bottom) & !is.na(dat$Depth.Top) &
+    dat$Depth.Top == dat$Depth.Bottom
+  jk <- j & k
+  dat$Depth[jk] <- dat$Depth.Top[jk]
+  dat$Depth.Top[k] <- NA
+  dat$Depth.Bottom[k] <- NA  
+  
+  #' Infill missing depths from top/bottom depths if possible, and include a
+  #' Depth Flag field to indicate whether values were infilled.
+  dat$Depth.Flag <- ''
   j <- is.na(dat$Depth)
   k <- !is.na(dat$Depth.Bottom) & is.na(dat$Depth.Top)
   jk <- j & k
   dat$Depth[jk] <- dat$Depth.Bottom[jk]
+  dat$Depth.Flag[jk] <- 'Bottom depth'
   
   j <- is.na(dat$Depth)
   k <- !is.na(dat$Depth.Bottom) & !is.na(dat$Depth.Top)
   jk <- j & k
   dat$Depth[jk] <- 0.5 * {dat$Depth.Top[jk] + dat$Depth.Bottom[jk]}
   # dat$Depth[jk] <- rowMeans(dat[jk,c('Depth.Bottom','Depth.Top')]) # for dat as data frame
+  dat$Depth.Flag[jk] <- 'Bottom and top depth midpoint'
+  
+  #' Omit records still lacking a depth entry
+  j <- !is.na(dat$Depth)
+  dat <- lapply(dat, function(z) z[j])
   
   dat$Seafloor.Depth <- dat$WaterDepth #' Seafloor depth should be estimable from bathymetry data and the lat/lon coordinates
   j <- is.na(dat$Seafloor.Depth) & !is.na(dat$WaterDepth_m)
   dat$Seafloor.Depth[j] <- dat$WaterDepth_m[j]
   omit <- c('WaterDepth','WaterDepth_m')
   dat[omit] <- NULL
-  
   
   #' ~~~~
   #' Gear
@@ -1512,6 +1530,7 @@ compile.data <- function(species.selection = NULL,
   dat$Sample.Gear[dat$Sample.Gear == 'ring net'] <- 'Ring net'
   dat$Sample.Gear[dat$Sample.Gear == 'water pump'] <- 'Water pump'
   dat$Sample.Gear <- gsub('WP-2', 'WP2', gsub('WPII', 'WP2', dat$Sample.Gear))
+  dat$Sample.Gear <- gsub(' \\(UNESCO Working Party 2\\)', '', dat$Sample.Gear)
   dat$Sample.Gear[dat$Sample.Gear %in% c('Other','unknown gear','Unspecified net')] <- 'Unspecified'
   
   # paste(sort(unique(dat$Sample.Gear)), collapse = ", ")
@@ -1545,7 +1564,7 @@ compile.data <- function(species.selection = NULL,
   dat$Sample.Gear[grepl('juday', dat$Sample.Gear, ignore.case = TRUE)] <- 'Juday net'
   # sort(unique(dat$Sample.Gear))
   
-  dat$Sample.Gear <- gsub('see cruise report', 'unspecified', dat$Sample.Gear)
+  dat$Sample.Gear <- gsub('see cruise report', 'Unspecified', dat$Sample.Gear)
   
   
   #' ~~~~~~~~~
@@ -1569,8 +1588,10 @@ compile.data <- function(species.selection = NULL,
   dat$Net.mesh.size[j] <- dat$Mesh[j]
   j <- !is.na(dat$MeshSize)
   dat$Net.mesh.size[j] <- dat$MeshSize[j]
+  j <- !is.na(dat$Net.Mesh)
+  dat$Net.mesh.size[j] <- dat$Net.Mesh[j]
   
-  omit <- c('Mesh.Size', 'Mesh', 'MeshSize')
+  omit <- c('Mesh.Size', 'Mesh', 'MeshSize', 'Net.Mesh')
   dat[omit] <- NULL
   names(dat)[names(dat) == 'Net.mesh.size'] <- 'Net.Mesh.Size'
   
@@ -2012,7 +2033,7 @@ compile.data <- function(species.selection = NULL,
     'Data.Source', 'Sample.Event', 'Date', 'Year', 'Month', 'Day.Of.Year', 'Time',
     'Time.Flag', 'Species', 'Maturity', 'Life.Stage', 'Copepodite.Stage', 'Sex',
     'Longitude', 'Latitude', 'Longitude.Start', 'Latitude.Start', 'Longitude.End',
-    'Latitude.End', 'Seafloor.Depth', 'Depth', 'Depth.Top', 'Depth.Bottom',
+    'Latitude.End', 'Seafloor.Depth', 'Depth', 'Depth.Flag', 'Depth.Top', 'Depth.Bottom',
     'Tow.Depth.Target', 'Sample.Gear', 'Net.Mesh.Size', 'Net.Mouth.Area',
     'Tow.Orientation', 'Measurement', 'Measurement.Value', 'Measurement.Unit',
     'Occurrence.Status', 'Cruise.Report')
@@ -2358,6 +2379,7 @@ compile.data <- function(species.selection = NULL,
   #' Swap NA values for '' where appropriate (characters but not factors)
   dat$Time[is.na(dat$Time)] <- ''
   dat$Time.Flag[is.na(dat$Time.Flag)] <- ''
+  dat$Depth.Flag[is.na(dat$Depth.Flag)] <- ''
   
   x <- dat$Data.Source
   # any(is.na(x))

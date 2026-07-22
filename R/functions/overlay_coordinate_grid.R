@@ -2,7 +2,7 @@ overlay_coordinate_grid <- function(
     plt, latlim = NULL, lat_increments = NULL, lat_step = 10,
     lat_step_minor = 0.5 * lat_step, lon_vals = NULL, singleLatAxis = FALSE,
     textSize = 4, lineWidth = 1, minorTicks = TRUE,
-    crs.base = NULL, crs.use = NULL, BBox = NULL){
+    crs.base = NULL, crs.use = NULL, BBox = NULL, colour = 'black'){
   # Round latlim to nearest lat_step
   if(!is.null(latlim))
     latlim[2] <- ceiling(latlim[2] / lat_step_minor) * lat_step_minor
@@ -23,7 +23,7 @@ overlay_coordinate_grid <- function(
   lat_lines <- st_linestring(x = lat_lines, dim = 'XY')
   lat_lines <- st_sfc(lat_lines, crs = crs.base)
   lat_lines <- st_transform(lat_lines, crs.use)
-  plt <- plt + geom_sf(data = lat_lines, linewidth = lineWidth) # axis line
+  plt <- plt + geom_sf(data = lat_lines, linewidth = lineWidth, colour = colour) # axis line
   # axis ticks
   nlat <- length(lat_increments)
   lr <- 1 / {{lat_increments - min(lat_increments)} / 
@@ -42,7 +42,7 @@ overlay_coordinate_grid <- function(
   gridPos <- st_multilinestring(x = gridPos, dim = 'XY')
   gridPos <- st_sfc(gridPos, crs = crs.base)
   gridPos <- st_transform(gridPos, crs = crs.use)
-  plt <- plt + geom_sf(data = gridPos, linewidth = lineWidth)
+  plt <- plt + geom_sf(data = gridPos, linewidth = lineWidth, colour = colour)
   # Repeat for minor ticks
   if(minorTicks){
     nlat_m <- length(lat_increments_minor)
@@ -61,7 +61,7 @@ overlay_coordinate_grid <- function(
     gridPos_m <- st_multilinestring(x = gridPos_m, dim = 'XY')
     gridPos_m <- st_sfc(gridPos_m, crs = crs.base)
     gridPos_m <- st_transform(gridPos_m, crs = crs.use)
-    plt <- plt + geom_sf(data = gridPos_m, linewidth = lineWidth) # axis ticks
+    plt <- plt + geom_sf(data = gridPos_m, linewidth = lineWidth, colour = colour) # axis ticks
   }
   
   gridPos <- st_cast(gridPos, "LINESTRING")
@@ -71,7 +71,7 @@ overlay_coordinate_grid <- function(
   plt <- plt +
     geom_sf_text(
       data = gridPos[2:nlat,], label = tick_labs[2:nlat],
-      parse = TRUE, hjust = 0, nudge_x = xnudge, size = textSize
+      parse = TRUE, hjust = 0, nudge_x = xnudge, size = textSize, colour = colour
     )
   
   #~~~~~~~~~~
@@ -109,7 +109,7 @@ overlay_coordinate_grid <- function(
   plt <- plt + 
     geom_sf_text(
       data = gridPos, label = lon_labs, parse = TRUE, vjust = vj,
-      nudge_x = xn, nudge_y = yn, size = textSize, angle = r)
+      nudge_x = xn, nudge_y = yn, size = textSize, angle = r, colour = colour)
   plt <- plt + theme(axis.title = element_blank())
   return(plt)
 }

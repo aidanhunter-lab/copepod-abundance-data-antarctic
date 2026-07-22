@@ -79,10 +79,13 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   
   # Load copepod occurrence records ----------------------------------------
   
-  #' Pull file names of original data (all with .gz or .zip extensions)
-  all.data.file.names <- lapply(dir.data.all, function(z){
+  #' Pull file names of original data (of specified file type)
+  file.type <- c('.gz')
+  all.data.file.names <- lapply(dir.data.all, function(z, x){
     f <- list.files(z)
-    f[{grepl('.gz', f) | grepl('.zip', f)} & !grepl('cleaned', f)]})
+    f <- f[apply(vgrepl(x, f), 1, any)]
+    f[!grepl('cleaned', f)]},
+    x = file.type)
   
   message('\nAll data file names:')
   print(all.data.file.names)
@@ -634,6 +637,8 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   eventDate <- gsub('T', ' ', eventDate) #' swap placeholder 'T' for space
   eventDate <- gsub('Z', '', eventDate) #' remove  trailing 'Z', which stands for zero added time (UTC)
   
+  dat$Time.Flag <- 'Assumed local time - time zone not specified'
+  
   #' Numerous formats -- work through them from least to most complicated
   fr2 <- '%Y-%m-%d %H:%M:%S'
   # sort(unique(nchar(eventDate)))
@@ -704,6 +709,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     x <- strptime(x, format = '%Y-%m-%d %H:%M')
     x <- x + adj*60^2
     eventDate[i&j] <- format(x, fr2)
+    dat$Time.Flag[i&j] <- 'Local time'
     eventDate[i] <- format(strptime(eventDate[i], format = fr2), fr2)
   }
   i <- nchar(eventDate) == 21 # Y-m-d/Y-m-d(start/end)
@@ -721,6 +727,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     x <- sapply(x, function(z) z[1])
     x <- strptime(x, format = fr2)
     eventDate[i&j] <- format(x + adj*60^2, fr2)
+    dat$Time.Flag[i&j] <- 'Local time'
     eventDate[i] <- format(strptime(eventDate[i], format = fr2), fr2)
   }
   i <- nchar(eventDate) == 23 # Y-m-d / Y-m-d (start / end)
@@ -750,6 +757,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     adjm <- as.numeric(sapply(adj, function(z) z[2]))
     adjs <- adjh*60^2 + adjm*60
     x <- x + adjs
+    dat$Time.Flag[i&j] <- 'Local time'
     eventDate[i&j] <- format(x, fr2)
   }
   i <- nchar(eventDate) == 33 # Y-m-d H:M/Y-m-d H:M (start/end)
@@ -769,6 +777,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     eventStart[i&j] <- format(strptime(sapply(x, function(z) z[1]), format = '%Y-%m-%d %H:%M') + adj*60^2, fr2)
     eventEnd[i&j] <- format(strptime(sapply(x, function(z) z[2]), format = '%Y-%m-%d %H:%M') + adj*60^2, fr2)
     eventDate[i&j] <- ''
+    dat$Time.Flag[i&j] <- 'Local time'
   }
   i <- nchar(eventDate) == 39 # Y-m-d H:M+H/Y-m-d H:M+H (start/end)
   if(any(i)){
@@ -784,6 +793,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     eventStart[i] <- format(strptime(xs, format = '%Y-%m-%d %H:%M') + adjs*60^2, fr2)
     eventEnd[i] <- format(strptime(xe, format = '%Y-%m-%d %H:%M') + adje*60^2, fr2)
     eventDate[i] <- ''
+    dat$Time.Flag[i] <- 'Local time'
   }
   
   #' Infill dates & times missing from some fields
@@ -826,6 +836,26 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$time_start <- format(strptime(eventStart, format = fr2), '%H:%M:%S')
   dat$time_end <- format(strptime(eventEnd, format = fr2), '%H:%M:%S')
   
+  #' Infill missing event mid-times if the start/end-times are available
+  i <- is.na(dat$time_mid) & !{is.na(dat$time_start) | is.na(dat$time_end)}
+  tm <- sapply(which(i), function(z){
+    t1 <- as.numeric(strsplit(dat$time_start[z], ':')[[1]])
+    t2 <- as.numeric(strsplit(dat$time_end[z], ':')[[1]])
+    t1 <- sum(t1 * c(3600,60,1))
+    t2 <- sum(t2 * c(3600,60,1))
+    if(t2 > t1) ys <- mean(c(t1,t2)) else ys <- mean(c(t1 - 86400, t2)) %% 86400
+    ym <- ys / 60
+    yh <- ym / 60
+    tm <- rep(0,3)
+    tm[1] <- trunc(yh)
+    tm[2] <- trunc(ym - tm[1]*60)
+    tm[3] <- trunc(ys - tm[1]*3600 - tm[2]*60)
+    tm <- paste(tm, collapse = ':')
+    tm <- format(strptime(tm, '%H:%M:%S'), '%H:%M:%S')
+    return(tm)
+  })
+  dat$time_mid[i] <- tm
+  
   #' Times recorded as 00:00:00 or 12:00:00 are suspicious, and it's tempting to
   #' remove them, but lots of times were reported to the hour, so even though
   #' there's an overabundance of 00:00:00 and 12:00:00, they should not be deemed
@@ -853,8 +883,9 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$month <- strftime(dat$date_mid, '%b')
   dat$dayOfYear <- as.numeric(strftime(dat$date_mid, '%j'))
   
-  dat$Time.Flag <- 'Assumed local time - time zone not specified'
-  dat$Time.Flag[is.na(dat$time_mid) | dat$time_mid == ''] <- ''
+  # dat$Time.Flag <- 'Assumed local time - time zone not specified'
+  noTimes <- apply(is.na(dat[c('time_mid','time_start','time_end')]), 1, all)
+  dat$Time.Flag[noTimes] <- ''
   
   #' ~~~~~~~~~~~~~~~~~~~~~~
   #' Sampling gear/protocol
@@ -1064,8 +1095,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$lat.r <- round(dat$decimalLatitude, digits = 2)
   
   x <- dat %>%
-    select(samplingProtocol, samplingEffort, basisOfRecord, eventID, date_mid,
-           time.inc, lon.r, lat.r) %>%
+    select(samplingProtocol, date_mid, time.inc, lon.r, lat.r) %>%
     distinct()
   x$Sample.event <- 1:nrow(x)
   dat <- suppressMessages(left_join(dat, x)) %>%
@@ -1315,6 +1345,8 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   eventDate <- dat$eventDate
   eventTime <- dat$eventTime
   
+  dat$Time.Flag <- 'Assumed local time - time zone not specified'
+  
   eventDate <- gsub('T',' ', eventDate)
   #' Separate time from dates
   dateSplit <- strsplit(eventDate, ' ')
@@ -1359,6 +1391,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     y <- sapply(y, function(z) z[1])
     eventTime[k] <- format(strptime(y, format = '%H:%M:%S') + adj, '%H:%M:%S')
     x[k] <- eventTime[k]
+    dat$Time.Flag[k] <- 'Local time'
   }
   i <- 17 #' H:M:S \\ H:M:S
   j <- nchar(eventTime) == i
@@ -1376,12 +1409,15 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     y <- sapply(y, function(z) z[1])
     eventTime[k] <- format(strptime(y, format = '%H:%M:%S') + adj*60^2, '%H:%M:%S')
     x[k] <- eventTime[k]
+    dat$Time.Flag[k] <- 'Local time'
   }
   
   eventTime <- x
   
   rm(x,y,i,j,i0,i12,k)
   
+  eventDate[eventDate == ''] <- NA
+  eventTime[eventTime == ''] <- NA
   dat$eventDate <- eventDate
   dat$eventTime <- eventTime
   
@@ -1389,8 +1425,9 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$dayOfYear <- as.numeric(strftime(as.Date(eventDate), '%j'))
   dat$month <- month.abb[dat$month] #' convert month to character abbreviation to match OBIS data set
   
-  dat$Time.Flag <- 'Assumed local time - time zone not specified'
-  dat$Time.Flag[is.na(dat$eventTime) | dat$eventTime == ''] <- ''
+  # dat$Time.Flag <- 'Assumed local time - time zone not specified'
+  noTimes <- is.na(dat$eventTime)
+  dat$Time.Flag[noTimes] <- ''
   
   #' ~~~~~~~~~~~~~~~~~~~~~~
   #' Sampling gear/protocol
@@ -1606,8 +1643,8 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$lat.r <- round(dat$decimalLatitude, digits = 2)
   
   x <- dat %>%
-    select(basisOfRecord, eventID, parentEventID, eventDate, samplingProtocol,
-           samplingEffort, time.inc, lon.r, lat.r) %>%
+    select(eventDate, samplingProtocol,
+           time.inc, lon.r, lat.r) %>%
     distinct()
   x$Sample.event <- 1:nrow(x)
   dat <- suppressMessages(left_join(dat, x)) %>%
@@ -1900,6 +1937,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   j[i] <- ''
   # dat$Copepodite.stage[dat$Maturity == 'adult'] <- 'C6'
   
+  #' ~~~~~~~~~
+  #' Net sizes
+  #' ~~~~~~~~~
+  # unique(dat$Net.type)
+  a <- setNames(c('1 m2', '8 m2', '25 m2'), c('RMT1+8', 'RMT8', 'RMT25'))
+  m <- setNames(c('330 µm', '5000 µm', '5000 µm'), c('RMT1+8', 'RMT8', 'RMT25'))
+  dat$Net.Area <-unname(a[dat$Net.type])
+  dat$Net.Mesh <-unname(m[dat$Net.type])
   
   #' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #' Reformat some abundance values
@@ -1950,7 +1995,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   #' ~~~~~~~~~~~~~~~
   #' Reorder columns
   #' ~~~~~~~~~~~~~~~
-  colOrder <- c('Taxon.name', 'Taxon.class', 'Sex', 'Maturity', 'Copepodite.stage', 'Net.type', 'Cruise.name', 'Sample.event', 'Season', 'Year', 'Month', 'Day', 'Time.Flag', 'Start.of.event', 'Lat', 'Lon', 'End.of.event', 'End.lat', 'End.lon', 'Max.depth', 'Abundance', 'Unit')
+  colOrder <- c('Taxon.name', 'Taxon.class', 'Sex', 'Maturity', 'Copepodite.stage', 'Net.type', 'Net.Area', 'Net.Mesh', 'Cruise.name', 'Sample.event', 'Season', 'Year', 'Month', 'Day', 'Time.Flag', 'Start.of.event', 'Lat', 'Lon', 'End.of.event', 'End.lat', 'End.lon', 'Max.depth', 'Abundance', 'Unit')
   dat <- dat[,colOrder]
   
   
@@ -2076,8 +2121,12 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$Time <- sapply(x, function(z) z[2])
   dat$Time <- paste0(dat$Time, ':00')
   
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  noTime <- is.na(dat$Time)
+  
   dat$Time.Flag <- 'Assumed local time - time zone not specified'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Time.Flag[noTime] <- ''
   
   
   dat$Unit <- 'individuals/m3'
@@ -2296,9 +2345,12 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$Time <- sapply(x, function(z) z[2])
   rm(nc, x)
   
-  dat$Time.Flag <- 'Assumed local time - time zone not specified'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  noTime <- is.na(dat$Time)
   
+  dat$Time.Flag <- 'Assumed local time - time zone not specified'
+  dat$Time.Flag[noTime] <- ''
   
   #' Data from some cruises are split over multiple tables, and some have
   #' duplicate events. Merge these into single tables with single Data.Table name.
@@ -2944,12 +2996,11 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat <- dat[,c(i,j,k)]
   
   #' Times are reported only for one dataset
-  i <- is.na(dat$Time)
-  dat$Time[i] <- ''
-  dat$Date.Time[i] <- ''
+  noTime <- is.na(dat$Time)
+  dat$Date.Time[noTime] <- NA
   
   dat$Time.Flag <- 'Assumed local time - time zone not specified'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Time.Flag[noTime] <- ''
   
   #' Column classes
   dat$Longitude <- as.numeric(dat$Longitude)
@@ -2963,7 +3014,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat <- dat[i,]
   
   #' Sort the data by date/time, species, and depth
-  noTime <- dat$Time == ''
+  noTime <- is.na(dat$Time)
   dat$Date.Time[noTime] <- paste(dat$Date[noTime], '12:00:00')
   dat$Date.Time <- strptime(dat$Date.Time, format = '%Y-%m-%d %H:%M:%S')
   dat$Species <- factor(dat$Species, levels = sort(unique(dat$Species)))
@@ -2973,7 +3024,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   dat$Life.Stage <- factor(dat$Life.Stage, levels = life.stages)
   o <- order(dat$Date.Time, dat$Species, dat$Life.Stage, dat$Depth.Mid)
   dat$Date.Time <- as.character(dat$Date.Time)
-  dat$Date.Time[noTime] <- ''
+  # dat$Date.Time[noTime] <- ''
   dat$Species <- as.character(dat$Species)
   dat$Life.Stage <- as.character(dat$Life.Stage)
   
@@ -3073,9 +3124,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     select(-TimeLocal)
   rm(hs, hl, date.shift, dts, dte, dtd, dtls, dtle)
   
-  dat$Time.Flag <- 'Local time'
-  dat$Time.Flag[is.na(dat$TimeStart) | dat$TimeStart == ''] <- ''
   
+  dat$TimeStart[dat$TimeStart == ''] <- NA
+  dat$TimeEnd[dat$TimeEnd == ''] <- NA
+  
+  noTime <- apply(is.na(dat[c('TimeStart','TimeEnd')]), 1, all)
+  
+  dat$Time.Flag <- 'Local time'
+  dat$Time.Flag[noTime] <- ''
   
   #' Remove rows outside of selected latitudinal range
   i <- lat_lim[1] <= dat$LatitudeStart & dat$LatitudeStart <= lat_lim[2]
@@ -3171,8 +3227,13 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     select(-TimeStart.GMT) %>% rename(TimeStart = TimeLocal.CLST) %>%
     rename(TimeEnd = TimeEnd.GMT) %>% mutate(TimeEnd = format(dtel, '%H:%M:%S'))
   
+  dat$TimeStart[dat$TimeStart == ''] <- NA
+  dat$TimeEnd[dat$TimeEnd == ''] <- NA
+  
+  noTime <- apply(is.na(dat[c('TimeStart','TimeEnd')]), 1, all)
+  
   dat$Time.Flag <- 'Local time'
-  dat$Time.Flag[is.na(dat$TimeStart) | dat$TimeStart == ''] <- ''
+  dat$Time.Flag[noTime] <- ''
   
   #' Adjust more column names
   names(dat)[names(dat) == 'Heading..º.'] <- 'Heading_degrees'
@@ -3353,9 +3414,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.GMT, -Time.GMT, -Date.Time.GMT, -Time.LOC, -Day)
   
-  dat$Time.Flag <- 'Local time - converted from GMT'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
   
+  noTime <- is.na(dat$Time)
+  
+  dat$Time.Flag <- 'Local time - converted from GMT'
+  dat$Time.Flag[noTime] <- ''
   
   #' Tow type
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
@@ -3648,9 +3714,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.GMT, -Time.GMT, -Date.Time.GMT, -Time.LOC, -Day)
   
-  dat$Time.Flag <- 'Local time - converted from GMT'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
   
+  noTime <- is.na(dat$Time)
+  
+  dat$Time.Flag <- 'Local time - converted from GMT'
+  dat$Time.Flag[noTime] <- ''
   
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
   dat$Tow.Orientation <- gsub('H', 'horizontal', dat$Tow.Orientation)
@@ -4038,8 +4109,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.GMT, -Time.GMT, -Date.Time.GMT, -Time.LOC, -Day)
   
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
+  
+  noTime <- is.na(dat$Time)
+  
   dat$Time.Flag <- 'Local time - converted from GMT'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Time.Flag[noTime] <- ''
   
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
   dat$Tow.Orientation <- gsub('H', 'horizontal', dat$Tow.Orientation)
@@ -4316,9 +4393,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.LOC, -Time.GMT, -Time.LOC, -Day)
   
-  dat$Time.Flag <- 'Local time'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
   
+  noTime <- is.na(dat$Time)
+  
+  dat$Time.Flag <- 'Local time'
+  dat$Time.Flag[noTime] <- ''
   
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
   dat$Tow.Orientation <- gsub('H', 'horizontal', dat$Tow.Orientation)
@@ -5060,9 +5142,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.GMT, -Time.GMT, -Date.Time.GMT, -Time.LOC, -Day)
   
-  dat$Time.Flag <- 'Local time - converted from GMT'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
   
+  noTime <- is.na(dat$Time)
+  
+  dat$Time.Flag <- 'Local time - converted from GMT'
+  dat$Time.Flag[noTime] <- ''
   
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
   dat$Tow.Orientation <- gsub('H', 'horizontal', dat$Tow.Orientation)
@@ -5363,9 +5450,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.GMT, -Time.GMT, -Date.Time.GMT, -Time.LOC, -Day)
   
-  dat$Time.Flag <- 'Local time - converted from GMT'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
   
+  noTime <- is.na(dat$Time)
+  
+  dat$Time.Flag <- 'Local time - converted from GMT'
+  dat$Time.Flag[noTime] <- ''
   
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
   dat$Tow.Orientation <- gsub('H', 'horizontal', dat$Tow.Orientation)
@@ -5672,8 +5764,14 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
     relocate(Date, Time, Date.Time, .before = Year) %>%
     select(-Date.GMT, -Date.LOC, -Time.GMT, -Date.Time.GMT, -Date.Time.LOC, -Time.LOC, -Day)
   
+  dat$Date[dat$Date == ''] <- NA
+  dat$Time[dat$Time == ''] <- NA
+  dat$Date.Time[dat$Date.Time == ''] <- NA
+  
+  noTime <- is.na(dat$Time)
+  
   dat$Time.Flag <- 'Local time'
-  dat$Time.Flag[is.na(dat$Time) | dat$Time == ''] <- ''
+  dat$Time.Flag[noTime] <- ''
   
   dat$Tow.Orientation <- gsub('V', 'vertical', dat$Tow.Orientation)
   dat$Tow.Orientation <- gsub('H', 'horizontal', dat$Tow.Orientation)
@@ -5926,6 +6024,7 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
       
       p <- dir.data.all[[Source]] #' directory path
       p <- file.path(p, f) #' full path
+      if(file.exists(p)) file.remove(p)
       write.csv(d, gzfile(p), row.names = FALSE) #' save cleaned data
     }
   }else{
