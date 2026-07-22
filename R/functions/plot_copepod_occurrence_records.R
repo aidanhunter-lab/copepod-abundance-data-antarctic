@@ -294,7 +294,7 @@ plot.data <- function(
   #' Save the plot
   
   if(save.plots){
-    plt.name <- 'map2.png'
+    plt.name <- 'map.png'
     wd <- 16
     ht <- 0.7 * wd
     
@@ -388,8 +388,19 @@ plot.data <- function(
   d.lab$x[!i] <- d.lab$x[!i] + 0.4 * d.lab$n[!i] # + 30
   d.lab$y[!i] <- d.lab$y[!i] - 0.5 * d.lab$number[!i]
   
-  #' Reconfigure an awkward label
-  d.lab$label[d.lab$label == 'Euchirella rostrata'] <- 'Euchirella\nrostrata'
+  #' Reconfigure awkward labels by splitting over 2 lines. This is probably
+  #' problematic at the right of the plot for 1 or more names under the points.
+  nsplit <- 2 #' number of names (from right) to split
+  if(nsplit > 0){
+    ltmp <- d.lab$label[nlab + {1:nsplit}]
+    ltmp <- sapply(strsplit(ltmp, ' '), function(z){
+      if(length(z) == 1) out <- z
+      if(length(z) == 2) out <- paste(z, collapse = '\n')
+      if(length(z) > 2) out <- paste(c(z[1], paste(z[-1], collapse = ' ')), collapse = '\n')
+      out})
+    d.lab$label[nlab + {1:nsplit}] <- ltmp
+  }
+  # d.lab$label[d.lab$label == 'Euchirella rostrata'] <- 'Euchirella\nrostrata'
   
   
   #' position the top ten sampled species
@@ -802,7 +813,7 @@ plot.data <- function(
     plot_layout(ncol = 1, heights = c(0.64,0.36))
   
   if(save.plots){
-    plt.name <- 'species_and_copepodite_stage3.png'
+    plt.name <- 'species_and_copepodite_stage.png'
     wd <- 16
     ht <- 1 * wd
     
@@ -1051,7 +1062,7 @@ plot.data <- function(
   # print(plt.time.depth)
   
   if(save.plots){
-    plt.name <- 'sample_years_and_depths2.png'
+    plt.name <- 'sample_years_and_depths.png'
     wd <- 16
     ht <- 0.7 * wd
     

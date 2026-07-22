@@ -80,12 +80,24 @@ clean.data <- function(lat_lim = c(-90,-30), save.cleaned.data = TRUE,
   # Load copepod occurrence records ----------------------------------------
   
   #' Pull file names of original data (of specified file type)
+  # file.type <- c('.gz')
+  # all.data.file.names <- lapply(dir.data.all, function(z, x){
+  #   f <- list.files(z)
+  #   f <- f[apply(vgrepl(x, f), 1, any)]
+  #   f[!grepl('cleaned', f)]},
+  #   x = file.type)
+  
   file.type <- c('.gz')
   all.data.file.names <- lapply(dir.data.all, function(z, x){
     f <- list.files(z)
-    f <- f[apply(vgrepl(x, f), 1, any)]
+    f.keep <- rep(FALSE, length(f))
+    for(ft in x){
+      n <- nchar(ft)
+      f.keep <- f.keep | substr(f, nchar(f)-n+1, nchar(f)) == ft}
+    f <- f[f.keep]
     f[!grepl('cleaned', f)]},
     x = file.type)
+  
   
   message('\nAll data file names:')
   print(all.data.file.names)
