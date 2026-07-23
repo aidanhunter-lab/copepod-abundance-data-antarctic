@@ -1485,6 +1485,12 @@ compile.data <- function(species.selection = NULL,
   omit <- c('WaterDepth','WaterDepth_m')
   dat[omit] <- NULL
   
+  #' Flag any entries where reported sample depth exceeds reported seafloor depth
+  j <- !is.na(dat$Seafloor.Depth) & !is.na(dat$Depth) &
+    dat$Depth > dat$Seafloor.Depth
+  j <- j & dat$Depth.Flag == ''
+  dat$Depth.Flag[j] <- 'Reported seafloor depth shallower than sample depth'
+  
   #' ~~~~
   #' Gear
   #' ~~~~
@@ -1983,7 +1989,11 @@ compile.data <- function(species.selection = NULL,
   y <- paste0('https://doi.org/', sapply(y, function(z) z[2]))
   x[i] <- y
   dat$Cruise.Report <- x
-  
+  #' Of values retained in this field after filtering, all genuine cruise reports
+  #' are from bodc, and other entries are just some doi references to methodological
+  #' papers. Retain only the cruise reports.
+  j <- grepl('bodc', dat$Cruise.Report)
+  dat$Cruise.Report[j] <- ''
   
   #' Omit entries lacking any measurement
   # ddd <- as.data.frame(dat[c('Measurement','Measurement.Unit','Occurrence.Status')])
@@ -2180,7 +2190,7 @@ compile.data <- function(species.selection = NULL,
     'Longitude', 'Latitude', 'Depth', 'Date', 'Time', 'Measurement.Value',
     'Measurement.Unit') #' fields to test for duplicate rows
   exDupFields <- c('Depth.Top', 'Depth.Bottom', 'Sample.Gear', 'Net.Mesh.Size',
-                   'Net.Mouth.Area', 'Cruise.Report') #' extra fields that may also be included, and used to scrap metadata
+                   'Net.Mouth.Area', 'Cruise.Report') #' extra fields that may also be included, and used to scrape metadata
   dupFields2 <- unique(c(dupFields, exDupFields))
   
   d <- dat %>%
