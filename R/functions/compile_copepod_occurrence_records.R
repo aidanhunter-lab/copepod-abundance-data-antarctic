@@ -1461,19 +1461,22 @@ compile.data <- function(species.selection = NULL,
   
   #' Infill missing depths from top/bottom depths if possible, and include a
   #' Depth Flag field to indicate whether values were infilled.
-  dat$Depth.Flag <- ''
+  dat$Depth.Flag <- NA
   j <- is.na(dat$Depth)
   k <- !is.na(dat$Depth.Bottom) & is.na(dat$Depth.Top)
   jk <- j & k
-  dat$Depth[jk] <- dat$Depth.Bottom[jk]
-  dat$Depth.Flag[jk] <- 'Bottom depth'
+  if(any(jk)){
+    dat$Depth[jk] <- dat$Depth.Bottom[jk]
+    dat$Depth.Flag[jk] <- 'Bottom depth'
+  }
   
   j <- is.na(dat$Depth)
   k <- !is.na(dat$Depth.Bottom) & !is.na(dat$Depth.Top)
   jk <- j & k
-  dat$Depth[jk] <- 0.5 * {dat$Depth.Top[jk] + dat$Depth.Bottom[jk]}
-  # dat$Depth[jk] <- rowMeans(dat[jk,c('Depth.Bottom','Depth.Top')]) # for dat as data frame
-  dat$Depth.Flag[jk] <- 'Bottom and top depth midpoint'
+  if(any(jk)){
+    dat$Depth[jk] <- 0.5 * {dat$Depth.Top[jk] + dat$Depth.Bottom[jk]}
+    dat$Depth.Flag[jk] <- 'Bottom and top depth midpoint'
+  }
   
   #' Omit records still lacking a depth entry
   j <- !is.na(dat$Depth)
@@ -1488,8 +1491,10 @@ compile.data <- function(species.selection = NULL,
   #' Flag any entries where reported sample depth exceeds reported seafloor depth
   j <- !is.na(dat$Seafloor.Depth) & !is.na(dat$Depth) &
     dat$Depth > dat$Seafloor.Depth
-  j <- j & dat$Depth.Flag == ''
+  j <- j & is.na(dat$Depth.Flag)
   dat$Depth.Flag[j] <- 'Reported seafloor depth shallower than sample depth'
+  
+  dat$Depth.Flag[is.na(dat$Depth.Flag)] <- ''
   
   #' ~~~~
   #' Gear
@@ -1992,7 +1997,7 @@ compile.data <- function(species.selection = NULL,
   #' Of values retained in this field after filtering, all genuine cruise reports
   #' are from bodc, and other entries are just some doi references to methodological
   #' papers. Retain only the cruise reports.
-  j <- grepl('bodc', dat$Cruise.Report)
+  j <- !grepl('bodc', dat$Cruise.Report)
   dat$Cruise.Report[j] <- ''
   
   #' Omit entries lacking any measurement
